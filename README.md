@@ -1,0 +1,2 @@
+# GoGame
+Game for study
