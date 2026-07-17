@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+coverage/
+*.out
+*.test
+*.tsbuildinfo
+
+# Go
+bin/
+tmp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Docker and local data
+.docker-data/
+postgres-data/
+
+# Codex and agent runtime scratch
+.agents/
+.codex/tmp/
