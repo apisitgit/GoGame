@@ -2,7 +2,7 @@
 
 Go Quest คือโปรเจกต์เกม RPG สำหรับเรียนภาษา Go เป็นภาษาไทย ตั้งแต่พื้นฐานจนถึงระดับใช้งานจริงในงาน backend
 
-ตอนนี้ repo อยู่ในช่วง Goal 5: เพิ่ม Coding Challenge ด้วย Monaco Editor และ mock runner สำหรับบท Hello World
+ตอนนี้ repo อยู่ในช่วง Goal 6: เพิ่ม Go Backend สำหรับ Lesson, Quest, Progress และ Submission metadata โดยยังไม่รันโค้ดผู้ใช้จริง
 
 ## AI Context
 
@@ -61,6 +61,7 @@ cp apps/api/.env.example apps/api/.env
 | `API_PORT` | port ของ Go API |
 | `CORS_ALLOWED_ORIGIN` | origin ของ frontend ที่ backend อนุญาต |
 | `DATABASE_URL` | PostgreSQL connection string; local Docker ใช้ host port `5433` |
+| `MIGRATIONS_DIR` | path ของ SQL migrations สำหรับ backend |
 
 ## Run With Docker Compose
 
@@ -155,6 +156,10 @@ go vet ./...
 - Reset Code และ Hint progression ทีละระดับ
 - Run/Submit ด้วย mock runner ที่ไม่รัน Go จริง
 - Submit ผ่านแล้ว quest เปลี่ยนเป็น `completed`
+- API `/api/v1/lessons`, `/api/v1/progress/:playerId`, `/api/v1/submissions`
+- PostgreSQL migrations สำหรับ `lessons`, `quests`, `players`, `player_progress` และ `submissions`
+- frontend sync progress/submission metadata ไป backend แบบ best-effort
+- API documentation ที่ `apps/api/API.md`
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
 - context rules ใน `.ai/`
@@ -164,9 +169,8 @@ go vet ./...
 - Login
 - AI Tutor
 - backend code runner, sandbox หรือ hidden tests จริง
-- Database schema/migrations จริง
-- backend-backed progress และ EXP จริง
+- backend-backed progress เป็น source of truth เต็มรูปแบบใน frontend
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือพัฒนา Go Backend สำหรับ Lesson, Quest, Progress และ Submission metadata โดยยังไม่รันโค้ดผู้ใช้จริง
+Goal ถัดไปที่แนะนำคือปรับ frontend ให้ใช้ backend progress เป็น source of truth เต็มรูปแบบ หรือเพิ่ม isolated Go code runner สำหรับ development เท่านั้น

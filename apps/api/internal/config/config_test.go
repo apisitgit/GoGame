@@ -28,4 +28,8 @@ func TestLoadUsesDevelopmentDefaults(t *testing.T) {
 	if cfg.AllowedOrigin != "http://localhost:5173" {
 		t.Fatalf("expected local frontend origin, got %s", cfg.AllowedOrigin)
 	}
+
+	if cfg.MigrationsDir != "migrations" {
+		t.Fatalf("expected default migrations dir, got %s", cfg.MigrationsDir)
+	}
 }

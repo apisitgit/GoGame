@@ -14,3 +14,9 @@ export type SubmissionState =
   | { status: "idle" }
   | { status: "passed"; stdout: string; message: string }
   | { status: "failed"; stdout: string; message: string };
+
+export type ChallengePassedMetadata = {
+  sourceSize: number;
+  stdoutPreview: string;
+  feedback: string;
+};

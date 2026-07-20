@@ -18,12 +18,12 @@ import { getVisibleHints, revealNextHint, resetHints } from "./hintProgression";
 import { MonacoCodeEditor } from "./MonacoCodeEditor";
 import { runMockGoChallenge } from "./mockRunner";
 import { createSubmissionStateFromRunResult } from "./submissionState";
-import type { SubmissionState } from "./types";
+import type { ChallengePassedMetadata, SubmissionState } from "./types";
 
 export type ChallengePanelProps = {
   lesson: LessonContent;
   onClose: () => void;
-  onSubmitPassed: () => void;
+  onSubmitPassed: (metadata: ChallengePassedMetadata) => void;
 };
 
 export function ChallengePanel({
@@ -76,7 +76,11 @@ export function ChallengePanel({
     setSubmissionState(createSubmissionStateFromRunResult(result));
 
     if (result.status === "passed") {
-      onSubmitPassed();
+      onSubmitPassed({
+        sourceSize: new Blob([sourceCode]).size,
+        stdoutPreview: result.stdout,
+        feedback: result.message,
+      });
     }
   }, [lesson.expectedOutput, onSubmitPassed, sourceCode]);
 

@@ -12,6 +12,9 @@ import (
 
 	"github.com/socket9companylimited/go-quest/apps/api/internal/config"
 	httpserver "github.com/socket9companylimited/go-quest/apps/api/internal/http"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/platform/database"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/platform/migrations"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/progress"
 )
 
 func main() {
@@ -23,7 +26,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := httpserver.NewRouter(cfg, logger)
+	var store httpserver.LearningStore
+	var closeDatabase func()
+	if cfg.DatabaseURL != "" {
+		dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		pool, err := database.Connect(dbCtx, cfg.DatabaseURL)
+		cancel()
+		if err != nil {
+			logger.Error("failed to connect database", "error", err)
+			os.Exit(1)
+		}
+
+		migrationCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		if err := migrations.Run(migrationCtx, pool, cfg.MigrationsDir); err != nil {
+			cancel()
+			pool.Close()
+			logger.Error("failed to run migrations", "error", err)
+			os.Exit(1)
+		}
+		cancel()
+
+		store = progress.NewStore(pool)
+		closeDatabase = pool.Close
+		logger.Info("database connected", "migrations_dir", cfg.MigrationsDir)
+	}
+
+	if closeDatabase != nil {
+		defer closeDatabase()
+	}
+
+	router := httpserver.NewRouter(cfg, logger, store)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,

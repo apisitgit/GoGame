@@ -2,6 +2,7 @@ import { Home, MessageCircle, Volume2, VolumeX } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { LessonPanel } from "../lessons/LessonPanel";
 import { getLessonByQuestId } from "../lessons/lessonRegistry";
+import { getOrCreatePlayerId } from "../progress/playerIdentity";
 import { DialogueBox } from "../quests/DialogueBox";
 import { QuestPanel } from "../quests/QuestPanel";
 import { professorGopher, firstQuest } from "../quests/questData";
@@ -16,11 +17,16 @@ import {
   saveQuestProgress,
 } from "../quests/questStorage";
 import { PhaserGame } from "../../game/PhaserGame";
+import type { ChallengePassedMetadata } from "../editor/types";
 import type {
   GameDebugState,
   NpcInteractEvent,
   NpcInteractionState,
 } from "../../game/events";
+import {
+  createSubmissionMetadata,
+  syncQuestProgress,
+} from "../../shared/api/progress";
 
 const ChallengePanel = lazy(() =>
   import("../editor/ChallengePanel").then((module) => ({
@@ -49,6 +55,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
   const [questProgress, setQuestProgress] = useState(() =>
     loadQuestProgress(window.localStorage),
   );
+  const [playerId] = useState(() => getOrCreatePlayerId(window.localStorage));
   const questStatus = getQuestStatus(questProgress, firstQuest);
   const lesson = getLessonByQuestId(firstQuest.id);
   const dialogueLines = useMemo(() => {
@@ -116,9 +123,14 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
       saveQuestProgress(window.localStorage, nextProgress);
       return nextProgress;
     });
+    void syncQuestProgress({
+      playerId,
+      questId: firstQuest.id,
+      status: "active",
+    });
     setDialogueSession(null);
     setIsLessonOpen(true);
-  }, []);
+  }, [playerId]);
 
   const handleResetProgress = useCallback(() => {
     setQuestProgress(resetQuestProgress(window.localStorage));
@@ -127,13 +139,22 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
     setIsChallengeOpen(false);
   }, []);
 
-  const handleChallengePassed = useCallback(() => {
+  const handleChallengePassed = useCallback((metadata: ChallengePassedMetadata) => {
     setQuestProgress((currentProgress) => {
       const nextProgress = completeQuest(currentProgress, firstQuest.id);
       saveQuestProgress(window.localStorage, nextProgress);
       return nextProgress;
     });
-  }, []);
+    void createSubmissionMetadata({
+      playerId,
+      questId: firstQuest.id,
+      lessonId: lesson?.id ?? "hello-world-001",
+      sourceSize: metadata.sourceSize,
+      status: "passed",
+      stdoutPreview: metadata.stdoutPreview,
+      feedback: metadata.feedback,
+    });
+  }, [lesson?.id, playerId]);
 
   const handleDialogueBack = useCallback(() => {
     setDialogueSession((currentSession) =>

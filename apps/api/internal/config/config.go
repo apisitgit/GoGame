@@ -10,6 +10,7 @@ type Config struct {
 	AllowedOrigin     string
 	Environment       string
 	DatabaseURL       string
+	MigrationsDir     string
 	CodeRunnerEnabled bool
 }
 
@@ -19,6 +20,7 @@ func Load() (Config, error) {
 		AllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:5173"),
 		Environment:   getEnv("APP_ENV", "development"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		MigrationsDir: getEnv("MIGRATIONS_DIR", "migrations"),
 	}
 
 	if cfg.Port == "" {

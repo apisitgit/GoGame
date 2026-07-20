@@ -15,7 +15,7 @@ type healthResponse struct {
 	Version string `json:"version"`
 }
 
-func NewRouter(cfg config.Config, logger *slog.Logger) http.Handler {
+func NewRouter(cfg config.Config, logger *slog.Logger, store LearningStore) http.Handler {
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -33,6 +33,8 @@ func NewRouter(cfg config.Config, logger *slog.Logger) http.Handler {
 			Version: "dev",
 		})
 	})
+
+	registerAPIRoutes(router, store)
 
 	return router
 }

@@ -13,7 +13,7 @@ func TestHealthEndpoint(t *testing.T) {
 	router := NewRouter(config.Config{
 		AllowedOrigin: "http://localhost:5173",
 		Environment:   "test",
-	}, slog.Default())
+	}, slog.Default(), nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	request.Header.Set("Origin", "http://localhost:5173")
@@ -38,7 +38,7 @@ func TestCORSRejectsUnknownOrigin(t *testing.T) {
 	router := NewRouter(config.Config{
 		AllowedOrigin: "http://localhost:5173",
 		Environment:   "test",
-	}, slog.Default())
+	}, slog.Default(), nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	request.Header.Set("Origin", "https://evil.example")
