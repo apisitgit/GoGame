@@ -1,9 +1,34 @@
-import { Activity, ShieldCheck, Swords } from "lucide-react";
+import { Activity, Play, ShieldCheck, Swords } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PlayPage } from "../features/play/PlayPage";
 import { fetchHealth } from "../shared/api/health";
 import type { HealthState } from "../shared/api/types";
 
 export function App() {
+  const [path, setPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    function syncPath() {
+      setPath(window.location.pathname);
+    }
+
+    window.addEventListener("popstate", syncPath);
+    window.addEventListener("go-quest:navigate", syncPath);
+
+    return () => {
+      window.removeEventListener("popstate", syncPath);
+      window.removeEventListener("go-quest:navigate", syncPath);
+    };
+  }, []);
+
+  if (path === "/play") {
+    return <PlayPage onNavigateHome={() => navigateTo("/")} />;
+  }
+
+  return <HomePage onPlay={() => navigateTo("/play")} />;
+}
+
+function HomePage({ onPlay }: { onPlay: () => void }) {
   const [health, setHealth] = useState<HealthState>({ status: "loading" });
 
   useEffect(() => {
@@ -50,6 +75,14 @@ export function App() {
               เพื่อเตรียมต่อยอดเป็นแผนที่, NPC, quest, lesson และ code editor
               ใน Goal ถัดไป
             </p>
+            <button
+              type="button"
+              className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-md bg-moss px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-moss focus:ring-offset-2"
+              onClick={onPlay}
+            >
+              <Play size={18} aria-hidden="true" />
+              เข้า Beginner Village
+            </button>
           </section>
 
           <section className="rounded-lg border border-ink/15 bg-white p-5 shadow-sm">
@@ -115,3 +148,7 @@ function getStatusCopy(health: HealthState) {
   };
 }
 
+function navigateTo(path: string) {
+  window.history.pushState({}, "", path);
+  window.dispatchEvent(new Event("go-quest:navigate"));
+}

@@ -2,7 +2,7 @@
 
 Go Quest คือโปรเจกต์เกม RPG สำหรับเรียนภาษา Go เป็นภาษาไทย ตั้งแต่พื้นฐานจนถึงระดับใช้งานจริงในงาน backend
 
-ตอนนี้ repo อยู่ในช่วง Goal 1: วาง monorepo foundation สำหรับ frontend, backend, database boundary และ local development
+ตอนนี้ repo อยู่ในช่วง Goal 2: เริ่มสร้าง Beginner Village ด้วย Phaser เพื่อให้เห็นเกมจริงและควบคุมตัวละครได้
 
 ## AI Context
 
@@ -134,6 +134,11 @@ go vet ./...
 - Go/Gin backend
 - `GET /health`
 - frontend health status
+- หน้า `/play` สำหรับ Beginner Village
+- Phaser scene พร้อม player movement ด้วย `WASD` และ arrow keys
+- collision กับขอบโลกและสิ่งกีดขวาง
+- camera follow
+- UI คำแนะนำภาษาไทย, ปุ่มเสียงแบบ placeholder และปุ่ม Home
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
 - context rules ใน `.ai/`
@@ -143,11 +148,10 @@ go vet ./...
 - Login
 - AI Tutor
 - Quest system
-- Phaser scene
 - Monaco challenge screen
 - Code runner
 - Database schema/migrations จริง
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือสร้าง Beginner Village scene ด้วย Phaser ให้ผู้เล่นเดินได้และเตรียมพื้นที่สำหรับ Professor Gopher
+Goal ถัดไปที่แนะนำคือเพิ่ม Professor Gopher และระบบ Quest แรกใน Beginner Village
