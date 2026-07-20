@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CheckCircle2,
+  Code2,
   CircleDot,
   Lock,
   RotateCcw,
@@ -13,6 +14,7 @@ type QuestPanelProps = {
   status: QuestStatus;
   hasLesson: boolean;
   onOpenLesson: () => void;
+  onOpenChallenge: () => void;
   onResetProgress: () => void;
 };
 
@@ -47,10 +49,12 @@ export function QuestPanel({
   status,
   hasLesson,
   onOpenLesson,
+  onOpenChallenge,
   onResetProgress,
 }: QuestPanelProps) {
   const copy = statusCopy[status];
   const canOpenLesson = hasLesson && (status === "active" || status === "completed");
+  const canOpenChallenge = status === "active" || status === "completed";
 
   return (
     <aside className="pointer-events-auto w-80 rounded-md border border-white/15 bg-ink/90 p-4 text-white shadow-lg backdrop-blur">
@@ -83,6 +87,16 @@ export function QuestPanel({
       >
         <BookOpen size={17} aria-hidden="true" />
         {status === "available" ? "รับ Quest ก่อน" : "เปิดบทเรียน"}
+      </button>
+
+      <button
+        type="button"
+        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-moss px-3 py-2 text-sm font-bold text-white transition hover:bg-moss/90 disabled:cursor-not-allowed disabled:opacity-55 focus:outline-none focus:ring-2 focus:ring-skyglass"
+        disabled={!canOpenChallenge}
+        onClick={onOpenChallenge}
+      >
+        <Code2 size={17} aria-hidden="true" />
+        เปิด Challenge
       </button>
 
       <button

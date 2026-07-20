@@ -1,11 +1,15 @@
 import { Home, MessageCircle, Volume2, VolumeX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { LessonPanel } from "../lessons/LessonPanel";
 import { getLessonByQuestId } from "../lessons/lessonRegistry";
 import { DialogueBox } from "../quests/DialogueBox";
 import { QuestPanel } from "../quests/QuestPanel";
 import { professorGopher, firstQuest } from "../quests/questData";
-import { acceptQuest, getQuestStatus } from "../quests/questProgress";
+import {
+  acceptQuest,
+  completeQuest,
+  getQuestStatus,
+} from "../quests/questProgress";
 import {
   loadQuestProgress,
   resetQuestProgress,
@@ -17,6 +21,12 @@ import type {
   NpcInteractEvent,
   NpcInteractionState,
 } from "../../game/events";
+
+const ChallengePanel = lazy(() =>
+  import("../editor/ChallengePanel").then((module) => ({
+    default: module.ChallengePanel,
+  })),
+);
 
 type PlayPageProps = {
   onNavigateHome: () => void;
@@ -35,6 +45,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
   const [dialogueSession, setDialogueSession] =
     useState<DialogueSession | null>(null);
   const [isLessonOpen, setIsLessonOpen] = useState(false);
+  const [isChallengeOpen, setIsChallengeOpen] = useState(false);
   const [questProgress, setQuestProgress] = useState(() =>
     loadQuestProgress(window.localStorage),
   );
@@ -113,6 +124,15 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
     setQuestProgress(resetQuestProgress(window.localStorage));
     setDialogueSession(null);
     setIsLessonOpen(false);
+    setIsChallengeOpen(false);
+  }, []);
+
+  const handleChallengePassed = useCallback(() => {
+    setQuestProgress((currentProgress) => {
+      const nextProgress = completeQuest(currentProgress, firstQuest.id);
+      saveQuestProgress(window.localStorage, nextProgress);
+      return nextProgress;
+    });
   }, []);
 
   const handleDialogueBack = useCallback(() => {
@@ -206,6 +226,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
               status={questStatus}
               hasLesson={Boolean(lesson)}
               onOpenLesson={() => setIsLessonOpen(true)}
+              onOpenChallenge={() => setIsChallengeOpen(true)}
               onResetProgress={handleResetProgress}
             />
           </div>
@@ -236,6 +257,16 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
 
           {isLessonOpen && lesson ? (
             <LessonPanel lesson={lesson} onClose={() => setIsLessonOpen(false)} />
+          ) : null}
+
+          {isChallengeOpen && lesson ? (
+            <Suspense fallback={<ChallengeLoadingPanel />}>
+              <ChallengePanel
+                lesson={lesson}
+                onClose={() => setIsChallengeOpen(false)}
+                onSubmitPassed={handleChallengePassed}
+              />
+            </Suspense>
           ) : null}
         </section>
       </div>
@@ -271,5 +302,15 @@ function isEditableTarget(target: EventTarget | null) {
     tagName === "input" ||
     tagName === "textarea" ||
     tagName === "select"
+  );
+}
+
+function ChallengeLoadingPanel() {
+  return (
+    <section className="pointer-events-auto absolute inset-3 z-40 grid place-items-center rounded-md border border-white/15 bg-ink/96 text-white shadow-2xl backdrop-blur">
+      <p className="text-sm font-semibold text-skyglass">
+        กำลังเปิด Code Editor...
+      </p>
+    </section>
   );
 }

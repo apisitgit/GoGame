@@ -2,7 +2,7 @@
 
 Go Quest คือโปรเจกต์เกม RPG สำหรับเรียนภาษา Go เป็นภาษาไทย ตั้งแต่พื้นฐานจนถึงระดับใช้งานจริงในงาน backend
 
-ตอนนี้ repo อยู่ในช่วง Goal 4: เพิ่มระบบ Lesson Content ภาษาไทยสำหรับ Hello World โดยแยกเนื้อหาออกจาก source code
+ตอนนี้ repo อยู่ในช่วง Goal 5: เพิ่ม Coding Challenge ด้วย Monaco Editor และ mock runner สำหรับบท Hello World
 
 ## AI Context
 
@@ -150,6 +150,11 @@ go vet ./...
 - schema validation สำหรับ lesson content
 - บทเรียน Hello World ภาษาไทยที่ผูกกับ Quest แรก
 - Lesson Panel สำหรับอ่าน story, problem, explanation, visual steps, syntax, hints และ common mistakes
+- Monaco Code Editor สำหรับ Quest `คำทักทายจาก Gopher`
+- draft code ใน `localStorage`
+- Reset Code และ Hint progression ทีละระดับ
+- Run/Submit ด้วย mock runner ที่ไม่รัน Go จริง
+- Submit ผ่านแล้ว quest เปลี่ยนเป็น `completed`
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
 - context rules ใน `.ai/`
@@ -158,11 +163,10 @@ go vet ./...
 
 - Login
 - AI Tutor
-- Monaco challenge screen
-- Code runner
+- backend code runner, sandbox หรือ hidden tests จริง
 - Database schema/migrations จริง
 - backend-backed progress และ EXP จริง
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือเพิ่ม Monaco Code Editor สำหรับ Quest `คำทักทายจาก Gopher` โดยใช้ mock runner ก่อน
+Goal ถัดไปที่แนะนำคือพัฒนา Go Backend สำหรับ Lesson, Quest, Progress และ Submission metadata โดยยังไม่รันโค้ดผู้ใช้จริง
