@@ -1,5 +1,7 @@
 import { Home, MessageCircle, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { LessonPanel } from "../lessons/LessonPanel";
+import { getLessonByQuestId } from "../lessons/lessonRegistry";
 import { DialogueBox } from "../quests/DialogueBox";
 import { QuestPanel } from "../quests/QuestPanel";
 import { professorGopher, firstQuest } from "../quests/questData";
@@ -32,10 +34,12 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
     useState<NpcInteractionState | null>(null);
   const [dialogueSession, setDialogueSession] =
     useState<DialogueSession | null>(null);
+  const [isLessonOpen, setIsLessonOpen] = useState(false);
   const [questProgress, setQuestProgress] = useState(() =>
     loadQuestProgress(window.localStorage),
   );
   const questStatus = getQuestStatus(questProgress, firstQuest);
+  const lesson = getLessonByQuestId(firstQuest.id);
   const dialogueLines = useMemo(() => {
     if (questStatus === "completed") {
       return professorGopher.completedDialogue;
@@ -102,11 +106,13 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
       return nextProgress;
     });
     setDialogueSession(null);
+    setIsLessonOpen(true);
   }, []);
 
   const handleResetProgress = useCallback(() => {
     setQuestProgress(resetQuestProgress(window.localStorage));
     setDialogueSession(null);
+    setIsLessonOpen(false);
   }, []);
 
   const handleDialogueBack = useCallback(() => {
@@ -198,6 +204,8 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
             <QuestPanel
               quest={firstQuest}
               status={questStatus}
+              hasLesson={Boolean(lesson)}
+              onOpenLesson={() => setIsLessonOpen(true)}
               onResetProgress={handleResetProgress}
             />
           </div>
@@ -224,6 +232,10 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
               onAcceptQuest={handleAcceptQuest}
               onClose={() => setDialogueSession(null)}
             />
+          ) : null}
+
+          {isLessonOpen && lesson ? (
+            <LessonPanel lesson={lesson} onClose={() => setIsLessonOpen(false)} />
           ) : null}
         </section>
       </div>

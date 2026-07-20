@@ -1,0 +1,89 @@
+{
+  "id": "hello-world-001",
+  "questId": "hello-gopher",
+  "title": "คำทักทายจาก Gopher",
+  "world": "beginner-village",
+  "concepts": ["package-main", "import", "func-main", "fmt-println"],
+  "story": {
+    "npc": "professor-gopher",
+    "text": "Professor Gopher อยากให้คุณส่งคำทักทายแรกให้หมู่บ้าน เพื่อยืนยันว่าโปรแกรม Go ของคุณเริ่มทำงานได้จริง"
+  },
+  "problem": {
+    "title": "หมู่บ้านยังไม่ได้ยินเสียงจากโปรแกรม",
+    "body": "ตอนนี้ตัวละครของคุณอยู่ในหมู่บ้านแล้ว แต่โปรแกรมยังไม่สามารถพูดอะไรออกมาทางหน้าจอได้ เราต้องสร้างโปรแกรม Go ขนาดเล็กที่เริ่มทำงานจากจุดที่ถูกต้อง แล้วแสดงข้อความแรกออกมา"
+  },
+  "objective": {
+    "text": "เขียนโปรแกรม Go ให้แสดงข้อความ \"สวัสดี Gopher\" ออกทางหน้าจอ"
+  },
+  "explanation": {
+    "sections": [
+      {
+        "title": "ทำไมต้องมี package main",
+        "body": "`package main` บอก Go ว่าไฟล์นี้อยู่ใน package ที่สร้างเป็นโปรแกรมรันได้ ถ้าเปรียบเป็นหมู่บ้าน package main คือป้ายหน้าประตูที่บอกว่า \"เข้าทางนี้เพื่อเริ่มเกม\""
+      },
+      {
+        "title": "import ใช้เรียกเครื่องมือ",
+        "body": "`import \"fmt\"` คือการหยิบเครื่องมือชื่อ fmt จาก standard library มาใช้ เครื่องมือนี้ช่วยให้โปรแกรมพิมพ์ข้อความออกทางหน้าจอได้"
+      },
+      {
+        "title": "func main คือจุดเริ่มทำงาน",
+        "body": "`func main()` คือฟังก์ชันแรกที่ Go เรียกเมื่อโปรแกรมเริ่มรัน ถ้าไม่มี main โปรแกรมจะไม่รู้ว่าควรเริ่มจากตรงไหน"
+      },
+      {
+        "title": "fmt.Println ทำให้โปรแกรมพูด",
+        "body": "`fmt.Println` ใช้พิมพ์ข้อความแล้วขึ้นบรรทัดใหม่ ในภารกิจนี้เราจะใช้มันให้โปรแกรมพูดคำว่า \"สวัสดี Gopher\""
+      }
+    ]
+  },
+  "visual": {
+    "title": "ภาพจำการเริ่มโปรแกรม",
+    "steps": [
+      "Go มองหา package main",
+      "Go เริ่มที่ func main",
+      "โปรแกรมเรียก fmt.Println",
+      "ข้อความแสดงบนหน้าจอ"
+    ]
+  },
+  "syntax": {
+    "language": "go",
+    "code": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"สวัสดี Gopher\")\n}"
+  },
+  "starterCode": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    // เขียนโค้ดตรงนี้\n}",
+  "expectedOutput": "สวัสดี Gopher",
+  "challenge": {
+    "title": "ส่งคำทักทายแรก",
+    "objective": "เติมคำสั่งใน func main เพื่อพิมพ์ข้อความให้ตรงกับโจทย์ทุกตัวอักษร"
+  },
+  "publicExamples": [
+    {
+      "input": "ไม่มี input",
+      "output": "สวัสดี Gopher",
+      "note": "ข้อความต้องตรงกัน รวมถึงช่องว่างและตัวพิมพ์"
+    }
+  ],
+  "hints": [
+    "ภารกิจนี้ต้องแสดงข้อความออกทางหน้าจอ",
+    "ใน Go เราใช้ fmt.Println เพื่อพิมพ์ข้อความ",
+    "ข้อความที่ต้องแสดงต้องอยู่ในเครื่องหมาย \"...\""
+  ],
+  "commonMistakes": [
+    {
+      "mistake": "ลืม import fmt",
+      "feedback": "ก่อนใช้ fmt.Println ต้องมี import \"fmt\" อยู่ด้านบน"
+    },
+    {
+      "mistake": "สะกด Println ผิด",
+      "feedback": "ชื่อที่ถูกต้องคือ Println โดยตัว P เป็นตัวใหญ่"
+    },
+    {
+      "mistake": "ข้อความไม่ตรงกับโจทย์",
+      "feedback": "Output ต้องเป็น \"สวัสดี Gopher\" ตรงทุกตัวอักษร"
+    },
+    {
+      "mistake": "ลืมเครื่องหมายคำพูด",
+      "feedback": "ข้อความใน Go ต้องอยู่ในเครื่องหมาย double quote เช่น \"ข้อความ\""
+    }
+  ],
+  "summary": "โปรแกรม Go ที่รันได้เริ่มจาก package main และ func main จากนั้นใช้ import เพื่อเรียกเครื่องมือจาก standard library เช่น fmt แล้วใช้ fmt.Println เพื่อแสดงข้อความออกทางหน้าจอ",
+  "nextUnlock": "variables-001"
+}

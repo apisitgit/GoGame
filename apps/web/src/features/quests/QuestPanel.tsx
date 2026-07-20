@@ -1,9 +1,18 @@
-import { CheckCircle2, CircleDot, Lock, RotateCcw, ScrollText } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  CircleDot,
+  Lock,
+  RotateCcw,
+  ScrollText,
+} from "lucide-react";
 import type { QuestDefinition, QuestStatus } from "./types";
 
 type QuestPanelProps = {
   quest: QuestDefinition;
   status: QuestStatus;
+  hasLesson: boolean;
+  onOpenLesson: () => void;
   onResetProgress: () => void;
 };
 
@@ -33,8 +42,15 @@ const statusCopy: Record<
   },
 };
 
-export function QuestPanel({ quest, status, onResetProgress }: QuestPanelProps) {
+export function QuestPanel({
+  quest,
+  status,
+  hasLesson,
+  onOpenLesson,
+  onResetProgress,
+}: QuestPanelProps) {
   const copy = statusCopy[status];
+  const canOpenLesson = hasLesson && (status === "active" || status === "completed");
 
   return (
     <aside className="pointer-events-auto w-80 rounded-md border border-white/15 bg-ink/90 p-4 text-white shadow-lg backdrop-blur">
@@ -58,6 +74,16 @@ export function QuestPanel({ quest, status, onResetProgress }: QuestPanelProps) 
         </div>
         <p className="text-sm font-bold text-white">{quest.rewardExp} EXP</p>
       </div>
+
+      <button
+        type="button"
+        className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-bold text-ink transition hover:bg-skyglass disabled:cursor-not-allowed disabled:opacity-55 focus:outline-none focus:ring-2 focus:ring-skyglass"
+        disabled={!canOpenLesson}
+        onClick={onOpenLesson}
+      >
+        <BookOpen size={17} aria-hidden="true" />
+        {status === "available" ? "รับ Quest ก่อน" : "เปิดบทเรียน"}
+      </button>
 
       <button
         type="button"
