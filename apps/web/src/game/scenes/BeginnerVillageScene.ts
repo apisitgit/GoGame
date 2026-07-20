@@ -1,10 +1,18 @@
 import Phaser from "phaser";
+import { professorGopher } from "../../features/quests/questData";
 import { Player } from "../entities/Player";
-import { DEBUG_STATE_EVENT, type GameDebugState } from "../events";
+import {
+  DEBUG_STATE_EVENT,
+  NPC_INTERACTION_STATE_EVENT,
+  NPC_INTERACT_EVENT,
+  type GameDebugState,
+} from "../events";
 
 const WORLD_WIDTH = 1600;
 const WORLD_HEIGHT = 1000;
 const TILE_SIZE = 64;
+const PROFESSOR_INTERACTION_RADIUS = 96;
+const PROFESSOR_POSITION = { x: 250, y: 180 };
 
 type Obstacle = {
   x: number;
@@ -25,6 +33,9 @@ const OBSTACLES: Obstacle[] = [
 
 export class BeginnerVillageScene extends Phaser.Scene {
   private player?: Player;
+  private professor?: Phaser.Types.Physics.Arcade.SpriteWithStaticBody;
+  private interactionKey?: Phaser.Input.Keyboard.Key;
+  private isNearProfessor = false;
   private lastDebugEventAt = 0;
 
   constructor() {
@@ -47,10 +58,22 @@ export class BeginnerVillageScene extends Phaser.Scene {
       obstacles.create(obstacle.x, obstacle.y, obstacle.texture).refreshBody();
     }
 
+    this.professor = this.physics.add.staticSprite(
+      PROFESSOR_POSITION.x,
+      PROFESSOR_POSITION.y,
+      "professor-gopher",
+    );
+    this.professor.setDepth(8);
+    this.professor.body?.setSize(34, 36).setOffset(7, 8);
+
     this.player = new Player(this, 180, 180);
     this.physics.add.collider(this.player.sprite, obstacles);
+    this.physics.add.collider(this.player.sprite, this.professor);
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(120, 80);
+    this.interactionKey = this.input.keyboard?.addKey(
+      Phaser.Input.Keyboard.KeyCodes.E,
+    );
 
     this.add
       .text(48, 48, "Beginner Village", {
@@ -66,6 +89,7 @@ export class BeginnerVillageScene extends Phaser.Scene {
 
   update(time: number) {
     this.player?.update();
+    this.updateProfessorInteraction();
     this.emitDebugState(time);
   }
 
@@ -116,6 +140,7 @@ export class BeginnerVillageScene extends Phaser.Scene {
     }
 
     this.createPlayerTexture();
+    this.createProfessorTexture();
     this.createGrassTexture();
     this.createTreeTexture();
     this.createRockTexture();
@@ -135,6 +160,29 @@ export class BeginnerVillageScene extends Phaser.Scene {
     graphics.fillRect(8, 30, 7, 8);
     graphics.fillRect(18, 30, 7, 8);
     graphics.generateTexture("player", 32, 40);
+    graphics.destroy();
+  }
+
+  private createProfessorTexture() {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0x2f6f45);
+    graphics.fillRoundedRect(8, 12, 32, 30, 8);
+    graphics.fillStyle(0xe8d7b3);
+    graphics.fillCircle(24, 12, 12);
+    graphics.fillStyle(0xf8f5ea);
+    graphics.fillCircle(18, 11, 4);
+    graphics.fillCircle(30, 11, 4);
+    graphics.fillStyle(0x203238);
+    graphics.fillCircle(18, 11, 2);
+    graphics.fillCircle(30, 11, 2);
+    graphics.lineStyle(3, 0x8f513d);
+    graphics.strokeCircle(18, 11, 6);
+    graphics.strokeCircle(30, 11, 6);
+    graphics.lineBetween(24, 11, 24, 11);
+    graphics.fillStyle(0x6f4432);
+    graphics.fillRect(14, 42, 7, 10);
+    graphics.fillRect(27, 42, 7, 10);
+    graphics.generateTexture("professor-gopher", 48, 56);
     graphics.destroy();
   }
 
@@ -186,5 +234,40 @@ export class BeginnerVillageScene extends Phaser.Scene {
     graphics.fillRect(70, 48, 16, 14);
     graphics.generateTexture("house", 112, 96);
     graphics.destroy();
+  }
+
+  private updateProfessorInteraction() {
+    if (!this.player || !this.professor) {
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(
+      this.player.sprite.x,
+      this.player.sprite.y,
+      this.professor.x,
+      this.professor.y,
+    );
+    const isNearby = distance <= PROFESSOR_INTERACTION_RADIUS;
+
+    if (isNearby !== this.isNearProfessor) {
+      this.isNearProfessor = isNearby;
+      this.game.events.emit(NPC_INTERACTION_STATE_EVENT, {
+        npcId: professorGopher.id,
+        questId: professorGopher.questId,
+        prompt: professorGopher.prompt,
+        isNearby,
+      });
+    }
+
+    if (
+      isNearby &&
+      this.interactionKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactionKey)
+    ) {
+      this.game.events.emit(NPC_INTERACT_EVENT, {
+        npcId: professorGopher.id,
+        questId: professorGopher.questId,
+      });
+    }
   }
 }
