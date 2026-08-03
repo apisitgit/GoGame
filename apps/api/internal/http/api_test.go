@@ -14,15 +14,17 @@ import (
 	"github.com/socket9companylimited/go-quest/apps/api/internal/config"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/domain"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/progress"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/runner"
 )
 
 const testPlayerID = "11111111-1111-4111-8111-111111111111"
 
 func TestAPIRoutesReturnServiceUnavailableWithoutStore(t *testing.T) {
 	router := NewRouter(config.Config{
-		AllowedOrigin: "http://localhost:5173",
-		Environment:   "test",
-	}, slog.Default(), nil)
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), nil, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/lessons", nil)
 	response := httptest.NewRecorder()
@@ -40,9 +42,10 @@ func TestAPIRoutesReturnServiceUnavailableWithoutStore(t *testing.T) {
 
 func TestGetProgressValidatesPlayerID(t *testing.T) {
 	router := NewRouter(config.Config{
-		AllowedOrigin: "http://localhost:5173",
-		Environment:   "test",
-	}, slog.Default(), fakeStore{})
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/progress/not-a-uuid", nil)
 	response := httptest.NewRecorder()
@@ -56,9 +59,10 @@ func TestGetProgressValidatesPlayerID(t *testing.T) {
 
 func TestCreateSubmissionReturnsCreatedSubmission(t *testing.T) {
 	router := NewRouter(config.Config{
-		AllowedOrigin: "http://localhost:5173",
-		Environment:   "test",
-	}, slog.Default(), fakeStore{})
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, nil)
 	body := bytes.NewBufferString(`{
 		"playerId":"11111111-1111-4111-8111-111111111111",
 		"questId":"hello-gopher",
@@ -90,9 +94,10 @@ func TestCreateSubmissionReturnsCreatedSubmission(t *testing.T) {
 
 func TestCreateSubmissionRejectsSourcePayloadField(t *testing.T) {
 	router := NewRouter(config.Config{
-		AllowedOrigin: "http://localhost:5173",
-		Environment:   "test",
-	}, slog.Default(), fakeStore{})
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, nil)
 	body := bytes.NewBufferString(`{
 		"playerId":"11111111-1111-4111-8111-111111111111",
 		"questId":"hello-gopher",
@@ -117,9 +122,10 @@ func TestCreateSubmissionRejectsSourcePayloadField(t *testing.T) {
 
 func TestCreateSubmissionRejectsOversizedSourceMetadata(t *testing.T) {
 	router := NewRouter(config.Config{
-		AllowedOrigin: "http://localhost:5173",
-		Environment:   "test",
-	}, slog.Default(), fakeStore{})
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, nil)
 	body := bytes.NewBufferString(`{
 		"playerId":"11111111-1111-4111-8111-111111111111",
 		"questId":"hello-gopher",
@@ -142,7 +148,100 @@ func TestCreateSubmissionRejectsOversizedSourceMetadata(t *testing.T) {
 	}
 }
 
+func TestRunCodeReturnsServiceUnavailableWithoutRunner(t *testing.T) {
+	router := NewRouter(config.Config{
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, nil)
+	body := bytes.NewBufferString(`{
+		"questId":"hello-gopher",
+		"lessonId":"hello-world-001",
+		"sourceCode":"package main\n\nfunc main() {}"
+	}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/run", body)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", response.Code)
+	}
+}
+
+func TestRunCodeForwardsSourceToRunner(t *testing.T) {
+	fakeRunner := fakeCodeRunner{
+		result: runner.RunResult{
+			Status:  runner.StatusPassed,
+			Stdout:  "สวัสดี Gopher\n",
+			Message: "โปรแกรมรันสำเร็จ",
+		},
+	}
+	router := NewRouter(config.Config{
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), fakeStore{}, &fakeRunner)
+	body := bytes.NewBufferString(`{
+		"questId":"hello-gopher",
+		"lessonId":"hello-world-001",
+		"sourceCode":"package main\n\nfunc main() {}"
+	}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/run", body)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d with %s", response.Code, response.Body.String())
+	}
+	if fakeRunner.seenSource == "" {
+		t.Fatal("expected API to forward source code to runner")
+	}
+	if !strings.Contains(response.Body.String(), "passed") {
+		t.Fatal("expected runner result")
+	}
+}
+
+func TestRunCodeRejectsOversizedSource(t *testing.T) {
+	router := NewRouter(config.Config{
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 10,
+	}, slog.Default(), fakeStore{}, &fakeCodeRunner{})
+	body := bytes.NewBufferString(`{
+		"questId":"hello-gopher",
+		"lessonId":"hello-world-001",
+		"sourceCode":"package main\n\nfunc main() {}"
+	}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/run", body)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
+	}
+	if !strings.Contains(response.Body.String(), "sourceCode") {
+		t.Fatal("expected sourceCode validation error")
+	}
+}
+
 type fakeStore struct{}
+
+type fakeCodeRunner struct {
+	result     runner.RunResult
+	err        error
+	seenSource string
+}
+
+func (fakeRunner *fakeCodeRunner) RunCode(_ context.Context, request runner.RunRequest) (runner.RunResult, error) {
+	fakeRunner.seenSource = request.SourceCode
+	return fakeRunner.result, fakeRunner.err
+}
 
 func (fakeStore) ListLessons(context.Context) ([]domain.Lesson, error) {
 	return []domain.Lesson{

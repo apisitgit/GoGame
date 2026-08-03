@@ -2,7 +2,7 @@
 
 Go Quest คือโปรเจกต์เกม RPG สำหรับเรียนภาษา Go เป็นภาษาไทย ตั้งแต่พื้นฐานจนถึงระดับใช้งานจริงในงาน backend
 
-ตอนนี้ repo อยู่ในช่วง Goal 6: เพิ่ม Go Backend สำหรับ Lesson, Quest, Progress และ Submission metadata โดยยังไม่รันโค้ดผู้ใช้จริง
+ตอนนี้ repo อยู่ในช่วง Goal 7: เพิ่ม development Go runner แบบแยก service สำหรับรัน code พื้นฐานใน local development
 
 ## AI Context
 
@@ -29,6 +29,7 @@ Go Quest คือโปรเจกต์เกม RPG สำหรับเร
 .
 ├── apps/
 │   ├── api/          # Go + Gin backend
+│   ├── runner/       # Development-only Go code runner
 │   └── web/          # React + TypeScript + Vite frontend
 ├── content/          # Future lesson and quest content
 ├── infrastructure/   # Future migrations and deployment support
@@ -62,6 +63,9 @@ cp apps/api/.env.example apps/api/.env
 | `CORS_ALLOWED_ORIGIN` | origin ของ frontend ที่ backend อนุญาต |
 | `DATABASE_URL` | PostgreSQL connection string; local Docker ใช้ host port `5433` |
 | `MIGRATIONS_DIR` | path ของ SQL migrations สำหรับ backend |
+| `CODE_RUNNER_ENABLED` | เปิด API proxy ไปหา development runner |
+| `RUNNER_URL` | URL ภายในหรือ local ของ runner service |
+| `MAX_SOURCE_BYTES` | ขนาด source code สูงสุดที่ API รับก่อนส่งต่อ runner |
 
 ## Run With Docker Compose
 
@@ -119,13 +123,24 @@ go test ./...
 go vet ./...
 ```
 
+Runner:
+
+```bash
+cd apps/runner
+gofmt -w .
+go test ./...
+go vet ./...
+```
+
 ## Security Notes
 
 - `CORS_ALLOWED_ORIGIN` ต้องเป็น origin เฉพาะเจาะจง ห้ามใช้ `*`
 - API มี request timeout และ security headers ตั้งแต่ foundation
 - API ยังไม่รันโค้ดของผู้เล่น และห้ามเพิ่มการรัน user code ใน API process
-- ระบบรัน Go code ต้องเป็น service แยกใน goal ภายหลัง พร้อม timeout, resource limit และ sandbox boundary
-- Docker Compose ใช้ `no-new-privileges` กับ web และ api service
+- Development runner อยู่ใน `apps/runner` และเป็น service แยกจาก API
+- Runner จำกัด source size, runtime timeout, output size, temporary workspace และ reject import เสี่ยงบางกลุ่ม
+- Runner ใน Goal 7 ยังไม่ใช่ production sandbox สำหรับเปิด public เพราะยังไม่มี gVisor/Firecracker/nsjail และยังไม่ได้จำกัด CPU/memory/process ด้วย isolation ระดับ kernel
+- Docker Compose ใช้ `no-new-privileges` กับ web, api และ runner service
 
 ## Current Scope
 
@@ -159,6 +174,9 @@ go vet ./...
 - API `/api/v1/lessons`, `/api/v1/progress/:playerId`, `/api/v1/submissions`
 - PostgreSQL migrations สำหรับ `lessons`, `quests`, `players`, `player_progress` และ `submissions`
 - frontend sync progress/submission metadata ไป backend แบบ best-effort
+- development Go runner service ที่รัน Go code พื้นฐานผ่าน `/api/v1/code/run`
+- API proxy ไปหา runner โดยไม่ใช้ `os/exec` ใน API process
+- runner timeout, source size limit, output cap, temp workspace และ static import guardrail
 - API documentation ที่ `apps/api/API.md`
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
@@ -168,9 +186,9 @@ go vet ./...
 
 - Login
 - AI Tutor
-- backend code runner, sandbox หรือ hidden tests จริง
+- production sandbox หรือ hidden tests จริง
 - backend-backed progress เป็น source of truth เต็มรูปแบบใน frontend
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือปรับ frontend ให้ใช้ backend progress เป็น source of truth เต็มรูปแบบ หรือเพิ่ม isolated Go code runner สำหรับ development เท่านั้น
+Goal ถัดไปที่แนะนำคือ Goal 8: เปลี่ยนการตรวจคำตอบจากการเทียบ stdout เป็น Go test cases โดยให้ hidden tests อยู่ฝั่ง server/runner เท่านั้น

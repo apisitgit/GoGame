@@ -1,11 +1,11 @@
-import type { MockRunResult } from "./types";
+import type { CodeChallengeRunResult } from "./types";
 
 const PRINTLN_PATTERN = /fmt\.Println\(\s*"([^"]*)"\s*\)/;
 
 export function runMockGoChallenge(
   sourceCode: string,
   expectedOutput: string,
-): MockRunResult {
+): CodeChallengeRunResult {
   const printedText = extractPrintedText(sourceCode);
 
   if (!sourceCode.includes("package main")) {

@@ -11,6 +11,16 @@ func TestLoadRejectsWildcardCORS(t *testing.T) {
 	}
 }
 
+func TestLoadRequiresRunnerURLWhenRunnerEnabled(t *testing.T) {
+	t.Setenv("CODE_RUNNER_ENABLED", "true")
+	t.Setenv("RUNNER_URL", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected missing runner URL to be rejected")
+	}
+}
+
 func TestLoadUsesDevelopmentDefaults(t *testing.T) {
 	t.Setenv("API_PORT", "")
 	t.Setenv("CORS_ALLOWED_ORIGIN", "")
@@ -31,5 +41,9 @@ func TestLoadUsesDevelopmentDefaults(t *testing.T) {
 
 	if cfg.MigrationsDir != "migrations" {
 		t.Fatalf("expected default migrations dir, got %s", cfg.MigrationsDir)
+	}
+
+	if cfg.MaxSourceBytes != 20_000 {
+		t.Fatalf("expected default max source bytes, got %d", cfg.MaxSourceBytes)
 	}
 }

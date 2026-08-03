@@ -15,6 +15,7 @@ import (
 	"github.com/socket9companylimited/go-quest/apps/api/internal/platform/database"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/platform/migrations"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/progress"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/runner"
 )
 
 func main() {
@@ -55,7 +56,13 @@ func main() {
 		defer closeDatabase()
 	}
 
-	router := httpserver.NewRouter(cfg, logger, store)
+	var codeRunner httpserver.CodeRunner
+	if cfg.CodeRunnerEnabled {
+		codeRunner = runner.NewClient(cfg.RunnerURL)
+		logger.Info("code runner client enabled", "runner_url", cfg.RunnerURL)
+	}
+
+	router := httpserver.NewRouter(cfg, logger, store, codeRunner)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,

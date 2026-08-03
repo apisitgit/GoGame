@@ -8,7 +8,7 @@ Base path:
 
 ## Security Boundary
 
-Goal 6 stores learning progress and submission metadata only.
+Goal 7 stores learning progress, submission metadata, and proxies development code runs to a separate runner service.
 
 The API does not:
 
@@ -17,7 +17,12 @@ The API does not:
 - store full source code
 - calculate trust from frontend-provided EXP
 
-Code execution must be implemented later as a separate runner service with sandboxing.
+Code execution boundary:
+
+- `/api/v1/code/run` validates request size and forwards source code to `apps/runner`.
+- The API process must not import `os/exec` or call `exec.Command` for user code.
+- `apps/runner` is development-only. It applies timeout, source size, output cap, temporary workspace, and import guardrails.
+- The runner is not a production sandbox yet. Do not expose it publicly without stronger isolation such as gVisor, Firecracker, nsjail, cgroup limits, and network isolation.
 
 ## Error Response
 
@@ -86,6 +91,48 @@ Allowed statuses:
 - `available`
 - `active`
 - `completed`
+
+### POST /api/v1/code/run
+
+Runs Go source code through the development runner service.
+
+Request:
+
+```json
+{
+  "questId": "hello-gopher",
+  "lessonId": "hello-world-001",
+  "sourceCode": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"สวัสดี Gopher\")\n}\n"
+}
+```
+
+Response:
+
+```json
+{
+  "status": "passed",
+  "stdout": "สวัสดี Gopher\n",
+  "stderr": "",
+  "message": "โปรแกรมรันสำเร็จ",
+  "executionTimeMs": 300,
+  "outputTruncated": false
+}
+```
+
+Possible statuses:
+
+- `passed`
+- `compile_error`
+- `runtime_error`
+- `timeout`
+- `rejected`
+- `internal_error`
+
+Notes:
+
+- This endpoint is for development runner feedback only.
+- Hidden tests are not implemented in Goal 7.
+- The frontend still compares stdout for the first quest until Goal 8 moves validation to server-managed Go tests.
 
 ### POST /api/v1/submissions
 

@@ -1,7 +1,7 @@
-import type { MockRunResult, SubmissionState } from "./types";
+import type { CodeChallengeRunResult, SubmissionState } from "./types";
 
 export function createSubmissionStateFromRunResult(
-  result: MockRunResult,
+  result: CodeChallengeRunResult,
 ): SubmissionState {
   return {
     status: result.status,

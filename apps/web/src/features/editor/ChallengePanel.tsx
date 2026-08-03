@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { runGoCode, type CodeRunResult } from "../../shared/api/codeRunner";
 import type { LessonContent } from "../lessons/types";
 import {
   loadChallengeDraft,
@@ -16,9 +17,12 @@ import {
 } from "./challengeDraftStorage";
 import { getVisibleHints, revealNextHint, resetHints } from "./hintProgression";
 import { MonacoCodeEditor } from "./MonacoCodeEditor";
-import { runMockGoChallenge } from "./mockRunner";
 import { createSubmissionStateFromRunResult } from "./submissionState";
-import type { ChallengePassedMetadata, SubmissionState } from "./types";
+import type {
+  ChallengePassedMetadata,
+  CodeChallengeRunResult,
+  SubmissionState,
+} from "./types";
 
 export type ChallengePanelProps = {
   lesson: LessonContent;
@@ -42,6 +46,7 @@ export function ChallengePanel({
     () => getVisibleHints(lesson.hints, revealedHintCount),
     [lesson.hints, revealedHintCount],
   );
+  const isRunning = submissionState.status === "running";
 
   useEffect(() => {
     saveChallengeDraft(window.localStorage, lesson.id, sourceCode);
@@ -66,14 +71,50 @@ export function ChallengePanel({
     );
   }, [lesson.hints]);
 
-  const handleRun = useCallback(() => {
-    const result = runMockGoChallenge(sourceCode, lesson.expectedOutput);
-    setSubmissionState(createSubmissionStateFromRunResult(result));
-  }, [lesson.expectedOutput, sourceCode]);
+  const executeChallengeRun = useCallback(async () => {
+    setSubmissionState({
+      status: "running",
+      message: "กำลังส่งโค้ดไปยัง development runner...",
+    });
 
-  const handleSubmit = useCallback(() => {
-    const result = runMockGoChallenge(sourceCode, lesson.expectedOutput);
-    setSubmissionState(createSubmissionStateFromRunResult(result));
+    try {
+      const result = await runGoCode({
+        questId: lesson.questId,
+        lessonId: lesson.id,
+        sourceCode,
+      });
+      const challengeResult = mapCodeRunToChallengeResult(
+        result,
+        lesson.expectedOutput,
+      );
+
+      setSubmissionState(
+        createSubmissionStateFromRunResult(challengeResult),
+      );
+
+      return challengeResult;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "runner ยังไม่พร้อมใช้งาน กรุณาลองใหม่อีกครั้ง";
+      const failedResult: CodeChallengeRunResult = {
+        status: "failed",
+        stdout: "",
+        message,
+      };
+
+      setSubmissionState(createSubmissionStateFromRunResult(failedResult));
+      return failedResult;
+    }
+  }, [lesson.expectedOutput, lesson.id, lesson.questId, sourceCode]);
+
+  const handleRun = useCallback(() => {
+    void executeChallengeRun();
+  }, [executeChallengeRun]);
+
+  const handleSubmit = useCallback(async () => {
+    const result = await executeChallengeRun();
 
     if (result.status === "passed") {
       onSubmitPassed({
@@ -82,13 +123,13 @@ export function ChallengePanel({
         feedback: result.message,
       });
     }
-  }, [lesson.expectedOutput, onSubmitPassed, sourceCode]);
+  }, [executeChallengeRun, onSubmitPassed, sourceCode]);
 
   useEffect(() => {
     function handleRunShortcut(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
-        handleRun();
+        void executeChallengeRun();
       }
     }
 
@@ -97,7 +138,7 @@ export function ChallengePanel({
     return () => {
       window.removeEventListener("keydown", handleRunShortcut);
     };
-  }, [handleRun]);
+  }, [executeChallengeRun]);
 
   return (
     <section
@@ -201,23 +242,26 @@ export function ChallengePanel({
             type="button"
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-skyglass"
             onClick={handleResetCode}
+            disabled={isRunning}
           >
             <RotateCcw size={17} aria-hidden="true" />
             Reset Code
           </button>
           <button
             type="button"
-            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-skyglass focus:outline-none focus:ring-2 focus:ring-skyglass"
+            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-skyglass disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-skyglass"
             title="Run (Ctrl/⌘ + Enter)"
             onClick={handleRun}
+            disabled={isRunning}
           >
             <Play size={17} aria-hidden="true" />
             Run
           </button>
           <button
             type="button"
-            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-bold text-white transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-skyglass"
+            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-bold text-white transition hover:bg-moss/90 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-skyglass"
             onClick={handleSubmit}
+            disabled={isRunning}
           >
             <Send size={17} aria-hidden="true" />
             Submit
@@ -226,6 +270,58 @@ export function ChallengePanel({
       </footer>
     </section>
   );
+}
+
+function mapCodeRunToChallengeResult(
+  result: CodeRunResult,
+  expectedOutput: string,
+): CodeChallengeRunResult {
+  if (result.status !== "passed") {
+    return {
+      status: "failed",
+      stdout: result.stdout,
+      message: buildFailureMessage(result),
+    };
+  }
+
+  const actualOutput = normalizeStdout(result.stdout);
+  if (actualOutput !== expectedOutput) {
+    return {
+      status: "failed",
+      stdout: actualOutput,
+      message: `โปรแกรมรันได้จริงแล้ว แต่ output ต้องเป็น "${expectedOutput}"`,
+    };
+  }
+
+  return {
+    status: "passed",
+    stdout: actualOutput,
+    message: "ผ่านแล้วครับ โปรแกรม Go รันจริงและแสดงข้อความตรงกับภารกิจ",
+  };
+}
+
+function normalizeStdout(stdout: string) {
+  return stdout.replace(/\r\n/g, "\n").trimEnd();
+}
+
+function buildFailureMessage(result: CodeRunResult) {
+  if (result.status === "timeout") {
+    return "โปรแกรมใช้เวลานานเกินไป ลองตรวจ loop หรือเงื่อนไขที่อาจไม่จบ";
+  }
+
+  if (result.status === "rejected") {
+    return result.message;
+  }
+
+  if (result.status === "compile_error") {
+    return result.stderr || "ยัง compile ไม่ผ่าน ลองอ่าน error แล้วแก้ทีละจุด";
+  }
+
+  if (result.status === "runtime_error") {
+    return result.stderr || "โปรแกรมเกิด runtime error ขณะรัน";
+  }
+
+  return result.message || "runner ยังตรวจคำตอบไม่สำเร็จ";
 }
 
 function ConsolePanel({
@@ -237,7 +333,16 @@ function ConsolePanel({
     return (
       <div className="flex min-h-20 items-center gap-3 text-sm text-white/60">
         <Terminal size={18} aria-hidden="true" />
-        กด Run เพื่อดูผลแบบ mock หรือ Submit เพื่อส่งภารกิจ
+        กด Run เพื่อรัน Go ผ่าน development runner หรือ Submit เพื่อส่งภารกิจ
+      </div>
+    );
+  }
+
+  if (submissionState.status === "running") {
+    return (
+      <div className="flex min-h-20 items-center gap-3 text-sm text-white/70">
+        <Terminal size={18} aria-hidden="true" />
+        {submissionState.message}
       </div>
     );
   }
