@@ -2,7 +2,7 @@
 
 Go Quest คือโปรเจกต์เกม RPG สำหรับเรียนภาษา Go เป็นภาษาไทย ตั้งแต่พื้นฐานจนถึงระดับใช้งานจริงในงาน backend
 
-ตอนนี้ repo อยู่ในช่วง Goal 7: เพิ่ม development Go runner แบบแยก service สำหรับรัน code พื้นฐานใน local development
+ตอนนี้ repo อยู่ในช่วง Goal 8: ตรวจ Coding Challenge ด้วย server-managed Go test cases ผ่าน development runner
 
 ## AI Context
 
@@ -139,7 +139,9 @@ go vet ./...
 - API ยังไม่รันโค้ดของผู้เล่น และห้ามเพิ่มการรัน user code ใน API process
 - Development runner อยู่ใน `apps/runner` และเป็น service แยกจาก API
 - Runner จำกัด source size, runtime timeout, output size, temporary workspace และ reject import เสี่ยงบางกลุ่ม
-- Runner ใน Goal 7 ยังไม่ใช่ production sandbox สำหรับเปิด public เพราะยังไม่มี gVisor/Firecracker/nsjail และยังไม่ได้จำกัด CPU/memory/process ด้วย isolation ระดับ kernel
+- Hidden tests อยู่ฝั่ง API และไม่ส่งไป browser
+- `Run` ใช้ runner เพื่อทดลองรัน code ส่วน `Submit` ใช้ server-managed Go tests และบันทึกผล submission
+- Development runner ยังไม่ใช่ production sandbox สำหรับเปิด public เพราะยังไม่มี gVisor/Firecracker/nsjail และยังไม่ได้จำกัด CPU/memory/process ด้วย isolation ระดับ kernel
 - Docker Compose ใช้ `no-new-privileges` กับ web, api และ runner service
 
 ## Current Scope
@@ -177,6 +179,8 @@ go vet ./...
 - development Go runner service ที่รัน Go code พื้นฐานผ่าน `/api/v1/code/run`
 - API proxy ไปหา runner โดยไม่ใช้ `os/exec` ใน API process
 - runner timeout, source size limit, output cap, temp workspace และ static import guardrail
+- API `/api/v1/code/submit` สำหรับตรวจด้วย hidden/server-managed Go tests
+- Submit ของบท Hello World ตรวจทั้ง output และการใช้ `fmt.Println` ผ่าน Go tests ฝั่ง server/runner
 - API documentation ที่ `apps/api/API.md`
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
@@ -186,9 +190,10 @@ go vet ./...
 
 - Login
 - AI Tutor
-- production sandbox หรือ hidden tests จริง
+- production sandbox
+- ระบบ hidden tests แบบ content/database-driven สำหรับหลายบทเรียน
 - backend-backed progress เป็น source of truth เต็มรูปแบบใน frontend
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือ Goal 8: เปลี่ยนการตรวจคำตอบจากการเทียบ stdout เป็น Go test cases โดยให้ hidden tests อยู่ฝั่ง server/runner เท่านั้น
+Goal ถัดไปที่แนะนำคือ Goal 9: เพิ่ม EXP, Level, Achievement และ Skill Tree ให้ผู้เล่นเห็น progression ชัดเจนขึ้น

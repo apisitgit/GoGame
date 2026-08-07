@@ -16,6 +16,13 @@ export type CodeRunResult = {
   message: string;
   executionTimeMs: number;
   outputTruncated: boolean;
+  tests?: {
+    passed: number;
+    failed: number;
+    total: number;
+    score: number;
+  };
+  submissionId?: string;
 };
 
 export type RunGoCodeInput = {
@@ -24,8 +31,31 @@ export type RunGoCodeInput = {
   sourceCode: string;
 };
 
+export type SubmitGoCodeInput = RunGoCodeInput & {
+  playerId: string;
+};
+
 export async function runGoCode(input: RunGoCodeInput): Promise<CodeRunResult> {
   const response = await fetch(`${getApiBaseUrl()}/api/v1/code/run`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readAPIErrorMessage(response));
+  }
+
+  return (await response.json()) as CodeRunResult;
+}
+
+export async function submitGoCode(
+  input: SubmitGoCodeInput,
+): Promise<CodeRunResult> {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/code/submit`, {
     method: "POST",
     headers: {
       Accept: "application/json",

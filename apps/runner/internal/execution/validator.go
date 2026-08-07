@@ -30,6 +30,12 @@ func validateRequest(request Request, maxSourceBytes int) error {
 	if strings.TrimSpace(request.SourceCode) == "" {
 		return fmt.Errorf("sourceCode ต้องไม่ว่าง")
 	}
+	if request.Command != "" && request.Command != CommandRun && request.Command != CommandTest {
+		return fmt.Errorf("command ต้องเป็น run หรือ test เท่านั้น")
+	}
+	if request.Command == CommandTest && strings.TrimSpace(request.TestSource) == "" {
+		return fmt.Errorf("testSource ต้องไม่ว่างเมื่อใช้ command test")
+	}
 
 	if len([]byte(request.SourceCode)) > maxSourceBytes {
 		return fmt.Errorf("sourceCode มีขนาดเกิน %d bytes", maxSourceBytes)

@@ -133,3 +133,84 @@ func main() {
 		t.Fatal("expected output to be marked as truncated")
 	}
 }
+
+func TestRunnerRunsGoTests(t *testing.T) {
+	runner := NewRunner(10*time.Second, 20_000, 20_000)
+
+	result := runner.Run(context.Background(), Request{
+		Language: "go",
+		Command:  CommandTest,
+		SourceCode: `package main
+
+func Add(a int, b int) int {
+	return a + b
+}
+`,
+		TestSource: `package main
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+	if Add(2, 3) != 5 {
+		t.Fatal("expected Add to return 5")
+	}
+}
+`,
+	})
+
+	if result.Status != StatusPassed {
+		t.Fatalf("expected passed, got %s with stderr %s", result.Status, result.Stderr)
+	}
+	if result.Tests == nil || result.Tests.Passed != 1 || result.Tests.Score != 100 {
+		t.Fatalf("expected one passed test, got %#v", result.Tests)
+	}
+}
+
+func TestRunnerReturnsFailedGoTests(t *testing.T) {
+	runner := NewRunner(10*time.Second, 20_000, 20_000)
+
+	result := runner.Run(context.Background(), Request{
+		Language: "go",
+		Command:  CommandTest,
+		SourceCode: `package main
+
+func Add(a int, b int) int {
+	return a - b
+}
+`,
+		TestSource: `package main
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+	if Add(2, 3) != 5 {
+		t.Fatal("expected Add to return 5")
+	}
+}
+`,
+	})
+
+	if result.Status != StatusFailed {
+		t.Fatalf("expected failed, got %s", result.Status)
+	}
+	if result.Tests == nil || result.Tests.Failed != 1 || result.Tests.Score != 0 {
+		t.Fatalf("expected one failed test, got %#v", result.Tests)
+	}
+}
+
+func TestRunnerRejectsTestCommandWithoutTestSource(t *testing.T) {
+	runner := NewRunner(10*time.Second, 20_000, 20_000)
+
+	result := runner.Run(context.Background(), Request{
+		Language: "go",
+		Command:  CommandTest,
+		SourceCode: `package main
+
+func main() {}
+`,
+	})
+
+	if result.Status != StatusRejected {
+		t.Fatalf("expected rejected, got %s", result.Status)
+	}
+}

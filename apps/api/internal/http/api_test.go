@@ -230,16 +230,112 @@ func TestRunCodeRejectsOversizedSource(t *testing.T) {
 	}
 }
 
+func TestSubmitCodeRunsServerManagedTestsAndStoresSubmission(t *testing.T) {
+	fakeRunner := fakeCodeRunner{
+		result: runner.RunResult{
+			Status:  runner.StatusPassed,
+			Message: "ผ่าน test cases แล้ว",
+			Tests: &runner.TestSummary{
+				Passed: 2,
+				Failed: 0,
+				Total:  2,
+				Score:  100,
+			},
+		},
+	}
+	store := &recordingStore{}
+	router := NewRouter(config.Config{
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), store, &fakeRunner)
+	body := bytes.NewBufferString(`{
+		"playerId":"11111111-1111-4111-8111-111111111111",
+		"questId":"hello-gopher",
+		"lessonId":"hello-world-001",
+		"sourceCode":"package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"สวัสดี Gopher\")\n}\n"
+	}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/submit", body)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d with %s", response.Code, response.Body.String())
+	}
+	if fakeRunner.seenCommand != runner.CommandTest {
+		t.Fatalf("expected test command, got %s", fakeRunner.seenCommand)
+	}
+	if fakeRunner.seenTestSource == "" {
+		t.Fatal("expected API to attach server-managed tests")
+	}
+	if strings.Contains(response.Body.String(), "TestMainPrintsThaiGreeting") {
+		t.Fatal("response must not expose hidden test implementation")
+	}
+	if store.createdSubmission.Status != domain.SubmissionStatusPassed {
+		t.Fatalf("expected passed submission to be stored, got %s", store.createdSubmission.Status)
+	}
+	if !strings.Contains(response.Body.String(), "submissionId") {
+		t.Fatal("expected response to include stored submission id")
+	}
+}
+
+func TestSubmitCodeStoresFailedTestSubmission(t *testing.T) {
+	fakeRunner := fakeCodeRunner{
+		result: runner.RunResult{
+			Status: runner.StatusFailed,
+			Tests: &runner.TestSummary{
+				Passed: 1,
+				Failed: 1,
+				Total:  2,
+				Score:  50,
+			},
+		},
+	}
+	store := &recordingStore{}
+	router := NewRouter(config.Config{
+		AllowedOrigin:  "http://localhost:5173",
+		Environment:    "test",
+		MaxSourceBytes: 20_000,
+	}, slog.Default(), store, &fakeRunner)
+	body := bytes.NewBufferString(`{
+		"playerId":"11111111-1111-4111-8111-111111111111",
+		"questId":"hello-gopher",
+		"lessonId":"hello-world-001",
+		"sourceCode":"package main\n\nfunc main() {}\n"
+	}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/submit", body)
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d with %s", response.Code, response.Body.String())
+	}
+	if store.createdSubmission.Status != domain.SubmissionStatusFailed {
+		t.Fatalf("expected failed submission to be stored, got %s", store.createdSubmission.Status)
+	}
+	if strings.Contains(response.Body.String(), "package main") {
+		t.Fatal("response must not expose hidden test source")
+	}
+}
+
 type fakeStore struct{}
 
 type fakeCodeRunner struct {
-	result     runner.RunResult
-	err        error
-	seenSource string
+	result         runner.RunResult
+	err            error
+	seenSource     string
+	seenTestSource string
+	seenCommand    runner.Command
 }
 
 func (fakeRunner *fakeCodeRunner) RunCode(_ context.Context, request runner.RunRequest) (runner.RunResult, error) {
 	fakeRunner.seenSource = request.SourceCode
+	fakeRunner.seenTestSource = request.TestSource
+	fakeRunner.seenCommand = request.Command
 	return fakeRunner.result, fakeRunner.err
 }
 
@@ -301,5 +397,25 @@ func (fakeStore) GetSubmission(context.Context, string) (domain.Submission, erro
 		LessonID:  "hello-world-001",
 		Status:    domain.SubmissionStatusPassed,
 		CreatedAt: time.Now(),
+	}, nil
+}
+
+type recordingStore struct {
+	fakeStore
+	createdSubmission progress.CreateSubmissionInput
+}
+
+func (store *recordingStore) CreateSubmission(_ context.Context, input progress.CreateSubmissionInput) (domain.Submission, error) {
+	store.createdSubmission = input
+	return domain.Submission{
+		ID:            "33333333-3333-4333-8333-333333333333",
+		PlayerID:      input.PlayerID,
+		QuestID:       input.QuestID,
+		LessonID:      input.LessonID,
+		SourceSize:    input.SourceSize,
+		Status:        input.Status,
+		StdoutPreview: input.StdoutPreview,
+		Feedback:      input.Feedback,
+		CreatedAt:     time.Now(),
 	}, nil
 }

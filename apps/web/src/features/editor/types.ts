@@ -20,4 +20,5 @@ export type ChallengePassedMetadata = {
   sourceSize: number;
   stdoutPreview: string;
   feedback: string;
+  submissionStored: boolean;
 };

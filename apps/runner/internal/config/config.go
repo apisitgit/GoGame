@@ -17,7 +17,7 @@ type Config struct {
 func Load() (Config, error) {
 	cfg := Config{
 		Port:           getEnv("RUNNER_PORT", "8090"),
-		Timeout:        getDurationEnv("RUNNER_TIMEOUT_MS", 5000),
+		Timeout:        getDurationEnv("RUNNER_TIMEOUT_MS", 10_000),
 		MaxSourceBytes: getIntEnv("RUNNER_MAX_SOURCE_BYTES", 20_000),
 		MaxOutputBytes: getIntEnv("RUNNER_MAX_OUTPUT_BYTES", 20_000),
 	}

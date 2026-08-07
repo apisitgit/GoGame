@@ -145,15 +145,17 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
       saveQuestProgress(window.localStorage, nextProgress);
       return nextProgress;
     });
-    void createSubmissionMetadata({
-      playerId,
-      questId: firstQuest.id,
-      lessonId: lesson?.id ?? "hello-world-001",
-      sourceSize: metadata.sourceSize,
-      status: "passed",
-      stdoutPreview: metadata.stdoutPreview,
-      feedback: metadata.feedback,
-    });
+    if (!metadata.submissionStored) {
+      void createSubmissionMetadata({
+        playerId,
+        questId: firstQuest.id,
+        lessonId: lesson?.id ?? "hello-world-001",
+        sourceSize: metadata.sourceSize,
+        status: "passed",
+        stdoutPreview: metadata.stdoutPreview,
+        feedback: metadata.feedback,
+      });
+    }
   }, [lesson?.id, playerId]);
 
   const handleDialogueBack = useCallback(() => {
@@ -284,6 +286,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
             <Suspense fallback={<ChallengeLoadingPanel />}>
               <ChallengePanel
                 lesson={lesson}
+                playerId={playerId}
                 onClose={() => setIsChallengeOpen(false)}
                 onSubmitPassed={handleChallengePassed}
               />

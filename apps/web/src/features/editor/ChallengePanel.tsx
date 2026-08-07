@@ -8,7 +8,11 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { runGoCode, type CodeRunResult } from "../../shared/api/codeRunner";
+import {
+  runGoCode,
+  submitGoCode,
+  type CodeRunResult,
+} from "../../shared/api/codeRunner";
 import type { LessonContent } from "../lessons/types";
 import {
   loadChallengeDraft,
@@ -26,12 +30,14 @@ import type {
 
 export type ChallengePanelProps = {
   lesson: LessonContent;
+  playerId: string;
   onClose: () => void;
   onSubmitPassed: (metadata: ChallengePassedMetadata) => void;
 };
 
 export function ChallengePanel({
   lesson,
+  playerId,
   onClose,
   onSubmitPassed,
 }: ChallengePanelProps) {
@@ -114,16 +120,28 @@ export function ChallengePanel({
   }, [executeChallengeRun]);
 
   const handleSubmit = useCallback(async () => {
-    const result = await executeChallengeRun();
+    setSubmissionState({
+      status: "running",
+      message: "กำลังตรวจคำตอบด้วย test cases ของภารกิจ...",
+    });
+
+    const result = await executeChallengeSubmit({
+      lessonId: lesson.id,
+      playerId,
+      questId: lesson.questId,
+      sourceCode,
+    });
+    setSubmissionState(createSubmissionStateFromRunResult(result));
 
     if (result.status === "passed") {
       onSubmitPassed({
         sourceSize: new Blob([sourceCode]).size,
         stdoutPreview: result.stdout,
         feedback: result.message,
+        submissionStored: result.submissionStored,
       });
     }
-  }, [executeChallengeRun, onSubmitPassed, sourceCode]);
+  }, [lesson.id, lesson.questId, onSubmitPassed, playerId, sourceCode]);
 
   useEffect(() => {
     function handleRunShortcut(event: KeyboardEvent) {
@@ -297,6 +315,55 @@ function mapCodeRunToChallengeResult(
     status: "passed",
     stdout: actualOutput,
     message: "ผ่านแล้วครับ โปรแกรม Go รันจริงและแสดงข้อความตรงกับภารกิจ",
+  };
+}
+
+async function executeChallengeSubmit(input: {
+  playerId: string;
+  questId: string;
+  lessonId: string;
+  sourceCode: string;
+}): Promise<CodeChallengeRunResult & { submissionStored: boolean }> {
+  try {
+    const result = await submitGoCode(input);
+    return mapSubmitResultToChallengeResult(result);
+  } catch (error) {
+    return {
+      status: "failed",
+      stdout: "",
+      message:
+        error instanceof Error
+          ? error.message
+          : "runner ยังตรวจคำตอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+      submissionStored: false,
+    };
+  }
+}
+
+function mapSubmitResultToChallengeResult(
+  result: CodeRunResult,
+): CodeChallengeRunResult & { submissionStored: boolean } {
+  const testSummary = result.tests
+    ? `ผ่าน ${result.tests.passed}/${result.tests.total} tests, คะแนน ${result.tests.score}%`
+    : "";
+  const message = testSummary
+    ? `${result.message} (${testSummary})`
+    : result.message;
+
+  if (result.status !== "passed") {
+    return {
+      status: "failed",
+      stdout: result.stdout,
+      message: buildFailureMessage({ ...result, message }),
+      submissionStored: Boolean(result.submissionId),
+    };
+  }
+
+  return {
+    status: "passed",
+    stdout: result.stdout,
+    message,
+    submissionStored: Boolean(result.submissionId),
   };
 }
 

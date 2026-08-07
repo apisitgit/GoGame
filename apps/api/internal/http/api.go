@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/challenges"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/domain"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/progress"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/runner"
@@ -71,6 +72,26 @@ type runCodeRequest struct {
 	SourceCode string `json:"sourceCode"`
 }
 
+type submitCodeRequest struct {
+	PlayerID   string `json:"playerId"`
+	QuestID    string `json:"questId"`
+	LessonID   string `json:"lessonId"`
+	SourceCode string `json:"sourceCode"`
+}
+
+type submitCodeResponse struct {
+	Status          runner.Status       `json:"status"`
+	Stdout          string              `json:"stdout"`
+	Stderr          string              `json:"stderr"`
+	Message         string              `json:"message"`
+	ExecutionTimeMS int64               `json:"executionTimeMs"`
+	OutputTruncated bool                `json:"outputTruncated"`
+	Tests           *runner.TestSummary `json:"tests,omitempty"`
+	SubmissionID    string              `json:"submissionId,omitempty"`
+	Submission      *domain.Submission  `json:"submission,omitempty"`
+	Details         map[string]string   `json:"details,omitempty"`
+}
+
 func registerAPIRoutes(router *gin.Engine, store LearningStore, codeRunner CodeRunner, maxSourceBytes int) {
 	handler := apiHandler{
 		store:          store,
@@ -85,6 +106,7 @@ func registerAPIRoutes(router *gin.Engine, store LearningStore, codeRunner CodeR
 	api.GET("/progress/:playerId", handler.getProgress)
 	api.PUT("/progress/:playerId", handler.updateProgress)
 	api.POST("/code/run", handler.runCode)
+	api.POST("/code/submit", handler.submitCode)
 	api.POST("/submissions", handler.createSubmission)
 	api.GET("/submissions/:id", handler.getSubmission)
 }
@@ -121,6 +143,72 @@ func (handler apiHandler) runCode(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, result)
+}
+
+func (handler apiHandler) submitCode(ctx *gin.Context) {
+	if handler.store == nil {
+		writeError(ctx, http.StatusServiceUnavailable, "service_unavailable", "ฐานข้อมูลยังไม่พร้อมใช้งาน", nil)
+		return
+	}
+	if handler.codeRunner == nil {
+		writeError(ctx, http.StatusServiceUnavailable, "service_unavailable", "development runner ยังไม่พร้อมใช้งาน", nil)
+		return
+	}
+	if !handler.runLimiter.Allow(ctx.ClientIP()) {
+		writeError(ctx, http.StatusTooManyRequests, "rate_limited", "ส่งโค้ดถี่เกินไป กรุณารอสักครู่", nil)
+		return
+	}
+
+	var request submitCodeRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		writeError(ctx, http.StatusBadRequest, "invalid_request", "ข้อมูล source code ไม่ถูกต้อง", nil)
+		return
+	}
+
+	if validationErrors := validateSubmitCodeRequest(request, handler.maxSourceBytes); len(validationErrors) > 0 {
+		writeError(ctx, http.StatusBadRequest, "invalid_request", "ข้อมูล source code ไม่ถูกต้อง", validationErrors)
+		return
+	}
+
+	spec, ok := challenges.GetValidationSpec(request.QuestID, request.LessonID)
+	if !ok {
+		writeError(ctx, http.StatusNotFound, "not_found", "ยังไม่มี test cases สำหรับภารกิจนี้", nil)
+		return
+	}
+
+	result, err := handler.codeRunner.RunCode(ctx.Request.Context(), runner.RunRequest{
+		Language:   "go",
+		SourceCode: request.SourceCode,
+		TestSource: spec.TestSource,
+		Command:    runner.CommandTest,
+	})
+	if err != nil {
+		writeError(ctx, http.StatusBadGateway, "runner_unavailable", "runner ยังไม่ตอบสนอง กรุณาลองใหม่อีกครั้ง", nil)
+		return
+	}
+
+	response := buildSubmitCodeResponse(result, spec)
+	submission, err := handler.store.CreateSubmission(ctx.Request.Context(), progress.CreateSubmissionInput{
+		PlayerID:      request.PlayerID,
+		QuestID:       request.QuestID,
+		LessonID:      request.LessonID,
+		SourceSize:    len([]byte(request.SourceCode)),
+		Status:        mapRunnerStatusToSubmissionStatus(result.Status),
+		StdoutPreview: truncatePreview(response.Stdout),
+		Feedback:      truncatePreview(response.Message),
+	})
+	if errors.Is(err, progress.ErrNotFound) {
+		writeError(ctx, http.StatusNotFound, "not_found", "ไม่พบ quest หรือ lesson ที่ระบุ", nil)
+		return
+	}
+	if err != nil {
+		writeInternalError(ctx)
+		return
+	}
+
+	response.SubmissionID = submission.ID
+	response.Submission = &submission
+	ctx.JSON(http.StatusOK, response)
 }
 
 func (handler apiHandler) listLessons(ctx *gin.Context) {
@@ -329,6 +417,100 @@ func validateRunCodeRequest(request runCodeRequest, maxSourceBytes int) map[stri
 	}
 
 	return validationErrors
+}
+
+func validateSubmitCodeRequest(request submitCodeRequest, maxSourceBytes int) map[string]any {
+	validationErrors := validateRunCodeRequest(runCodeRequest{
+		QuestID:    request.QuestID,
+		LessonID:   request.LessonID,
+		SourceCode: request.SourceCode,
+	}, maxSourceBytes)
+
+	if !isUUID(request.PlayerID) {
+		validationErrors["playerId"] = "ต้องเป็น UUID"
+	}
+
+	return validationErrors
+}
+
+func buildSubmitCodeResponse(result runner.RunResult, spec challenges.ValidationSpec) submitCodeResponse {
+	response := submitCodeResponse{
+		Status:          result.Status,
+		Stdout:          sanitizeSubmitStdout(result),
+		Stderr:          sanitizeSubmitStderr(result),
+		Message:         buildSubmitMessage(result, spec),
+		ExecutionTimeMS: result.ExecutionTimeMS,
+		OutputTruncated: result.OutputTruncated,
+		Tests:           result.Tests,
+	}
+
+	if result.Status == runner.StatusFailed {
+		response.Details = map[string]string{
+			"hint": "อ่าน Hint ทีละระดับ แล้วลอง Run ก่อน Submit อีกครั้ง",
+		}
+	}
+
+	return response
+}
+
+func buildSubmitMessage(result runner.RunResult, spec challenges.ValidationSpec) string {
+	switch result.Status {
+	case runner.StatusPassed:
+		return spec.SuccessMessage
+	case runner.StatusFailed:
+		return spec.FailureMessage
+	case runner.StatusCompileError:
+		return "ยัง compile ไม่ผ่าน ลองอ่าน error แล้วแก้ syntax ก่อน Submit อีกครั้ง"
+	case runner.StatusRuntimeError:
+		return "โปรแกรมเกิด runtime error ระหว่างตรวจ test cases"
+	case runner.StatusTimeout:
+		return "โปรแกรมใช้เวลานานเกินไป ลองตรวจ loop หรือเงื่อนไขที่อาจไม่จบ"
+	case runner.StatusRejected:
+		return result.Message
+	default:
+		return "runner ยังตรวจคำตอบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+	}
+}
+
+func sanitizeSubmitStdout(result runner.RunResult) string {
+	if result.Status == runner.StatusPassed {
+		return "ผ่าน test cases"
+	}
+
+	return ""
+}
+
+func sanitizeSubmitStderr(result runner.RunResult) string {
+	if result.Status == runner.StatusCompileError {
+		return truncatePreview(result.Stderr)
+	}
+
+	return ""
+}
+
+func mapRunnerStatusToSubmissionStatus(status runner.Status) domain.SubmissionStatus {
+	switch status {
+	case runner.StatusPassed:
+		return domain.SubmissionStatusPassed
+	case runner.StatusCompileError:
+		return domain.SubmissionStatusCompileError
+	case runner.StatusRuntimeError:
+		return domain.SubmissionStatusRuntimeError
+	case runner.StatusTimeout:
+		return domain.SubmissionStatusTimeout
+	case runner.StatusFailed, runner.StatusRejected:
+		return domain.SubmissionStatusFailed
+	default:
+		return domain.SubmissionStatusInternalError
+	}
+}
+
+func truncatePreview(value string) string {
+	if len(value) <= maxPreviewLength {
+		return value
+	}
+
+	return value[:maxPreviewLength]
 }
 
 func writeInternalError(ctx *gin.Context) {

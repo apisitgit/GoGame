@@ -1,6 +1,6 @@
 # Go Quest Development Runner
 
-`apps/runner` เป็น service แยกสำหรับรัน Go code ใน local development ของ Goal 7
+`apps/runner` เป็น service แยกสำหรับรัน Go code และ Go tests ใน local development
 
 ## Security Boundary
 
@@ -43,6 +43,19 @@ Request:
 }
 ```
 
+For server-managed tests, API may call the same endpoint with `command: "test"` and a trusted `testSource`:
+
+```json
+{
+  "language": "go",
+  "command": "test",
+  "sourceCode": "package main\n\nfunc main() {}\n",
+  "testSource": "package main\n\nimport \"testing\"\n\nfunc TestSomething(t *testing.T) {}\n"
+}
+```
+
+Browser clients must not send `testSource` directly. In Go Quest, only the API service attaches hidden tests before forwarding work to runner.
+
 Response:
 
 ```json
@@ -59,6 +72,7 @@ Response:
 Possible statuses:
 
 - `passed`
+- `failed`
 - `compile_error`
 - `runtime_error`
 - `timeout`

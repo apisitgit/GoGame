@@ -19,7 +19,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.Port != "8090" {
 		t.Fatalf("expected default port, got %s", cfg.Port)
 	}
-	if cfg.Timeout != 5000*time.Millisecond {
+	if cfg.Timeout != 10_000*time.Millisecond {
 		t.Fatalf("expected default timeout, got %s", cfg.Timeout)
 	}
 	if cfg.MaxSourceBytes != 20_000 {
