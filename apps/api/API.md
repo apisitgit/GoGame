@@ -8,7 +8,7 @@ Base path:
 
 ## Security Boundary
 
-Goal 8 stores learning progress, submission metadata, and proxies development code runs/tests to a separate runner service.
+Goal 9 stores learning progress, submission metadata, player progression, and proxies development code runs/tests to a separate runner service.
 
 The API does not:
 
@@ -16,11 +16,12 @@ The API does not:
 - accept hidden tests from the browser
 - store full source code
 - calculate trust from frontend-provided EXP
+- accept reward amounts from the browser
 
 Code execution boundary:
 
 - `/api/v1/code/run` validates request size and forwards source code to `apps/runner`.
-- `/api/v1/code/submit` validates request size, selects server-managed test cases, forwards source and tests to `apps/runner`, then stores the submission result.
+- `/api/v1/code/submit` validates request size, selects server-managed test cases, forwards source and tests to `apps/runner`, then stores the submission result and returns backend-calculated progression.
 - The API process must not import `os/exec` or call `exec.Command` for user code.
 - `apps/runner` is development-only. It applies timeout, source size, output cap, temporary workspace, and import guardrails.
 - Hidden test source lives in backend challenge validation code and must not be returned to the browser.
@@ -62,6 +63,14 @@ Response:
 {
   "playerId": "11111111-1111-4111-8111-111111111111",
   "totalExp": 100,
+  "level": {
+    "level": 2,
+    "currentExp": 100,
+    "currentLevelExp": 100,
+    "nextLevelExp": 250,
+    "expToNextLevel": 150,
+    "progressPercent": 0
+  },
   "quests": [
     {
       "questId": "hello-gopher",
@@ -69,6 +78,30 @@ Response:
       "earnedExp": 100,
       "completedAt": "2026-07-20T09:00:00Z",
       "updatedAt": "2026-07-20T09:00:00Z"
+    }
+  ],
+  "achievements": [
+    {
+      "id": "first-gopher-greeting",
+      "title": "First Gopher Greeting",
+      "description": "ผ่านภารกิจทักทาย Gopher ครั้งแรก",
+      "status": "unlocked"
+    }
+  ],
+  "skillTree": [
+    {
+      "id": "hello-world",
+      "title": "Hello World",
+      "description": "เริ่มโปรแกรม Go และแสดงข้อความแรก",
+      "status": "completed",
+      "prerequisiteIds": []
+    },
+    {
+      "id": "variables",
+      "title": "Variables",
+      "description": "เก็บข้อมูลไว้ใช้ต่อในโปรแกรม",
+      "status": "unlocked",
+      "prerequisiteIds": ["hello-world"]
     }
   ]
 }
@@ -146,6 +179,7 @@ Request:
   "playerId": "11111111-1111-4111-8111-111111111111",
   "questId": "hello-gopher",
   "lessonId": "hello-world-001",
+  "revealedHints": 1,
   "sourceCode": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"สวัสดี Gopher\")\n}\n"
 }
 ```
@@ -166,7 +200,22 @@ Response:
     "total": 2,
     "score": 100
   },
-  "submissionId": "33333333-3333-4333-8333-333333333333"
+  "submissionId": "33333333-3333-4333-8333-333333333333",
+  "progress": {
+    "playerId": "11111111-1111-4111-8111-111111111111",
+    "totalExp": 100,
+    "level": {
+      "level": 2,
+      "currentExp": 100,
+      "currentLevelExp": 100,
+      "nextLevelExp": 250,
+      "expToNextLevel": 150,
+      "progressPercent": 0
+    },
+    "quests": [],
+    "achievements": [],
+    "skillTree": []
+  }
 }
 ```
 
@@ -175,7 +224,9 @@ Notes:
 - Hidden test implementation is not included in the response.
 - Passed submissions complete the quest through the same backend transaction used by `POST /api/v1/submissions`.
 - Failed, compile error, runtime error, and timeout submissions are also stored as submission metadata.
-- EXP is still protected by the existing progress upsert rule, so repeated passed submissions do not grant duplicate EXP.
+- `revealedHints` lets the backend apply the current reward rule: hint 1 is free, hint 2 reduces 10 EXP, and hint 3 reduces 20 EXP.
+- EXP amount is calculated by backend configuration, and repeated passed submissions do not grant duplicate EXP.
+- MVP limitation: hint count is currently client-reported. Production should record hint usage server-side before awarding competitive rewards.
 
 ### POST /api/v1/submissions
 

@@ -80,6 +80,21 @@ describe("runGoCode", () => {
             score: 100,
           },
           submissionId: "33333333-3333-4333-8333-333333333333",
+          progress: {
+            playerId: "11111111-1111-4111-8111-111111111111",
+            totalExp: 100,
+            level: {
+              level: 2,
+              currentExp: 100,
+              currentLevelExp: 100,
+              nextLevelExp: 250,
+              expToNextLevel: 150,
+              progressPercent: 0,
+            },
+            quests: [],
+            achievements: [],
+            skillTree: [],
+          },
         }),
         { status: 200 },
       ),
@@ -90,16 +105,18 @@ describe("runGoCode", () => {
       playerId: "11111111-1111-4111-8111-111111111111",
       questId: "hello-gopher",
       lessonId: "hello-world-001",
+      revealedHints: 2,
       sourceCode: "package main\n\nfunc main() {}",
     });
 
     expect(result.tests?.score).toBe(100);
+    expect(result.progress?.level.level).toBe(2);
     expect(result.submissionId).toBe("33333333-3333-4333-8333-333333333333");
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8080/api/v1/code/submit",
       expect.objectContaining({
         method: "POST",
-        body: expect.stringContaining("playerId"),
+        body: expect.stringContaining("revealedHints"),
       }),
     );
   });

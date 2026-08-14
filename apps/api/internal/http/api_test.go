@@ -14,6 +14,7 @@ import (
 	"github.com/socket9companylimited/go-quest/apps/api/internal/config"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/domain"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/progress"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/progression"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/runner"
 )
 
@@ -253,6 +254,7 @@ func TestSubmitCodeRunsServerManagedTestsAndStoresSubmission(t *testing.T) {
 		"playerId":"11111111-1111-4111-8111-111111111111",
 		"questId":"hello-gopher",
 		"lessonId":"hello-world-001",
+		"revealedHints":3,
 		"sourceCode":"package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"สวัสดี Gopher\")\n}\n"
 	}`)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/code/submit", body)
@@ -276,8 +278,14 @@ func TestSubmitCodeRunsServerManagedTestsAndStoresSubmission(t *testing.T) {
 	if store.createdSubmission.Status != domain.SubmissionStatusPassed {
 		t.Fatalf("expected passed submission to be stored, got %s", store.createdSubmission.Status)
 	}
+	if store.createdSubmission.RevealedHints != 3 {
+		t.Fatalf("expected revealed hint count to be stored, got %d", store.createdSubmission.RevealedHints)
+	}
 	if !strings.Contains(response.Body.String(), "submissionId") {
 		t.Fatal("expected response to include stored submission id")
+	}
+	if !strings.Contains(response.Body.String(), `"progress"`) {
+		t.Fatal("expected response to include player progression")
 	}
 }
 
@@ -357,18 +365,18 @@ func (fakeStore) GetLesson(context.Context, string) (domain.Lesson, error) {
 }
 
 func (fakeStore) GetProgress(context.Context, string) (domain.PlayerProgress, error) {
-	return domain.PlayerProgress{
+	return progression.Enrich(domain.PlayerProgress{
 		PlayerID: testPlayerID,
-		TotalEXP: 0,
+		TotalEXP: 100,
 		Quests: []domain.QuestProgress{
 			{
 				QuestID:   "hello-gopher",
-				Status:    domain.QuestStatusAvailable,
-				EarnedEXP: 0,
+				Status:    domain.QuestStatusCompleted,
+				EarnedEXP: 100,
 				UpdatedAt: time.Now(),
 			},
 		},
-	}, nil
+	}), nil
 }
 
 func (fakeStore) UpsertQuestProgress(context.Context, progress.UpsertQuestProgressInput) (domain.PlayerProgress, error) {

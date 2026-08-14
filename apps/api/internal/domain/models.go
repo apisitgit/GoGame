@@ -51,9 +51,51 @@ type QuestProgress struct {
 }
 
 type PlayerProgress struct {
-	PlayerID string          `json:"playerId"`
-	TotalEXP int             `json:"totalExp"`
-	Quests   []QuestProgress `json:"quests"`
+	PlayerID     string             `json:"playerId"`
+	TotalEXP     int                `json:"totalExp"`
+	Level        LevelProgress      `json:"level"`
+	Quests       []QuestProgress    `json:"quests"`
+	Achievements []Achievement      `json:"achievements"`
+	SkillTree    []SkillProgression `json:"skillTree"`
+}
+
+type LevelProgress struct {
+	Level           int `json:"level"`
+	CurrentEXP      int `json:"currentExp"`
+	CurrentLevelEXP int `json:"currentLevelExp"`
+	NextLevelEXP    int `json:"nextLevelExp"`
+	EXPToNextLevel  int `json:"expToNextLevel"`
+	ProgressPercent int `json:"progressPercent"`
+}
+
+type AchievementStatus string
+
+const (
+	AchievementStatusLocked   AchievementStatus = "locked"
+	AchievementStatusUnlocked AchievementStatus = "unlocked"
+)
+
+type Achievement struct {
+	ID          string            `json:"id"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Status      AchievementStatus `json:"status"`
+}
+
+type SkillStatus string
+
+const (
+	SkillStatusLocked    SkillStatus = "locked"
+	SkillStatusUnlocked  SkillStatus = "unlocked"
+	SkillStatusCompleted SkillStatus = "completed"
+)
+
+type SkillProgression struct {
+	ID              string      `json:"id"`
+	Title           string      `json:"title"`
+	Description     string      `json:"description"`
+	Status          SkillStatus `json:"status"`
+	PrerequisiteIDs []string    `json:"prerequisiteIds"`
 }
 
 type Submission struct {

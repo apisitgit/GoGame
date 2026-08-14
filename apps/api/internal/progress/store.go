@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/socket9companylimited/go-quest/apps/api/internal/domain"
+	"github.com/socket9companylimited/go-quest/apps/api/internal/progression"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -31,6 +32,7 @@ type CreateSubmissionInput struct {
 	Status        domain.SubmissionStatus
 	StdoutPreview string
 	Feedback      string
+	RevealedHints int
 }
 
 func NewStore(pool *pgxpool.Pool) *Store {
@@ -119,7 +121,7 @@ func (store *Store) GetProgress(ctx context.Context, playerID string) (domain.Pl
 		return domain.PlayerProgress{}, fmt.Errorf("iterate progress: %w", err)
 	}
 
-	return progress, nil
+	return progression.Enrich(progress), nil
 }
 
 func (store *Store) UpsertQuestProgress(ctx context.Context, input UpsertQuestProgressInput) (domain.PlayerProgress, error) {
@@ -135,7 +137,7 @@ func (store *Store) UpsertQuestProgress(ctx context.Context, input UpsertQuestPr
 		return domain.PlayerProgress{}, err
 	}
 
-	if err := upsertProgressTx(ctx, tx, input.PlayerID, input.QuestID, input.Status); err != nil {
+	if err := upsertProgressTx(ctx, tx, input.PlayerID, input.QuestID, input.Status, 0); err != nil {
 		return domain.PlayerProgress{}, err
 	}
 
@@ -160,7 +162,7 @@ func (store *Store) CreateSubmission(ctx context.Context, input CreateSubmission
 	}
 
 	if input.Status == domain.SubmissionStatusPassed {
-		if err := upsertProgressTx(ctx, tx, input.PlayerID, input.QuestID, domain.QuestStatusCompleted); err != nil {
+		if err := upsertProgressTx(ctx, tx, input.PlayerID, input.QuestID, domain.QuestStatusCompleted, input.RevealedHints); err != nil {
 			return domain.Submission{}, err
 		}
 	}
@@ -252,7 +254,7 @@ func ensurePlayerTx(ctx context.Context, tx pgx.Tx, playerID string) error {
 	return nil
 }
 
-func upsertProgressTx(ctx context.Context, tx pgx.Tx, playerID string, questID string, status domain.QuestStatus) error {
+func upsertProgressTx(ctx context.Context, tx pgx.Tx, playerID string, questID string, status domain.QuestStatus, revealedHints int) error {
 	var rewardEXP int
 	if err := tx.QueryRow(ctx, `SELECT reward_exp FROM quests WHERE id = $1`, questID).Scan(&rewardEXP); errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
@@ -278,6 +280,8 @@ func upsertProgressTx(ctx context.Context, tx pgx.Tx, playerID string, questID s
 		return nil
 	}
 
+	earnedReward := progression.CompleteLessonReward(rewardEXP, revealedHints)
+
 	_, err := tx.Exec(ctx, `
 		INSERT INTO player_progress (player_id, quest_id, status, earned_exp, completed_at, updated_at)
 		VALUES ($1, $2, 'completed', $3, now(), now())
@@ -290,7 +294,7 @@ func upsertProgressTx(ctx context.Context, tx pgx.Tx, playerID string, questID s
 			END,
 			completed_at = COALESCE(player_progress.completed_at, now()),
 			updated_at = now()
-	`, playerID, questID, rewardEXP)
+	`, playerID, questID, earnedReward)
 	if err != nil {
 		return fmt.Errorf("complete progress: %w", err)
 	}

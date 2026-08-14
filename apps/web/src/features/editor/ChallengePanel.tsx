@@ -129,6 +129,7 @@ export function ChallengePanel({
       lessonId: lesson.id,
       playerId,
       questId: lesson.questId,
+      revealedHints: revealedHintCount,
       sourceCode,
     });
     setSubmissionState(createSubmissionStateFromRunResult(result));
@@ -139,9 +140,17 @@ export function ChallengePanel({
         stdoutPreview: result.stdout,
         feedback: result.message,
         submissionStored: result.submissionStored,
+        progress: result.progress,
       });
     }
-  }, [lesson.id, lesson.questId, onSubmitPassed, playerId, sourceCode]);
+  }, [
+    lesson.id,
+    lesson.questId,
+    onSubmitPassed,
+    playerId,
+    revealedHintCount,
+    sourceCode,
+  ]);
 
   useEffect(() => {
     function handleRunShortcut(event: KeyboardEvent) {
@@ -322,8 +331,11 @@ async function executeChallengeSubmit(input: {
   playerId: string;
   questId: string;
   lessonId: string;
+  revealedHints: number;
   sourceCode: string;
-}): Promise<CodeChallengeRunResult & { submissionStored: boolean }> {
+}): Promise<
+  CodeChallengeRunResult & Pick<ChallengePassedMetadata, "progress" | "submissionStored">
+> {
   try {
     const result = await submitGoCode(input);
     return mapSubmitResultToChallengeResult(result);
@@ -340,9 +352,8 @@ async function executeChallengeSubmit(input: {
   }
 }
 
-function mapSubmitResultToChallengeResult(
-  result: CodeRunResult,
-): CodeChallengeRunResult & { submissionStored: boolean } {
+function mapSubmitResultToChallengeResult(result: CodeRunResult): CodeChallengeRunResult &
+  Pick<ChallengePassedMetadata, "progress" | "submissionStored"> {
   const testSummary = result.tests
     ? `ผ่าน ${result.tests.passed}/${result.tests.total} tests, คะแนน ${result.tests.score}%`
     : "";
@@ -356,6 +367,7 @@ function mapSubmitResultToChallengeResult(
       stdout: result.stdout,
       message: buildFailureMessage({ ...result, message }),
       submissionStored: Boolean(result.submissionId),
+      progress: result.progress,
     };
   }
 
@@ -364,6 +376,7 @@ function mapSubmitResultToChallengeResult(
     stdout: result.stdout,
     message,
     submissionStored: Boolean(result.submissionId),
+    progress: result.progress,
   };
 }
 

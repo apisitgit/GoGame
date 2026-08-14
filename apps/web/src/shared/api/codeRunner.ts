@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "./config";
+import type { PlayerProgressResponse } from "./progress";
 
 export type CodeRunStatus =
   | "passed"
@@ -23,6 +24,7 @@ export type CodeRunResult = {
     score: number;
   };
   submissionId?: string;
+  progress?: PlayerProgressResponse;
 };
 
 export type RunGoCodeInput = {
@@ -33,6 +35,7 @@ export type RunGoCodeInput = {
 
 export type SubmitGoCodeInput = RunGoCodeInput & {
   playerId: string;
+  revealedHints: number;
 };
 
 export async function runGoCode(input: RunGoCodeInput): Promise<CodeRunResult> {

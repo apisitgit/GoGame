@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import { LessonPanel } from "../lessons/LessonPanel";
 import { getLessonByQuestId } from "../lessons/lessonRegistry";
 import { getOrCreatePlayerId } from "../progress/playerIdentity";
+import { ProgressionPanel } from "../progress/ProgressionPanel";
 import { DialogueBox } from "../quests/DialogueBox";
 import { QuestPanel } from "../quests/QuestPanel";
 import { professorGopher, firstQuest } from "../quests/questData";
@@ -25,8 +26,11 @@ import type {
 } from "../../game/events";
 import {
   createSubmissionMetadata,
+  fetchPlayerProgress,
   syncQuestProgress,
+  type PlayerProgressResponse,
 } from "../../shared/api/progress";
+import type { QuestProgress } from "../quests/types";
 
 const ChallengePanel = lazy(() =>
   import("../editor/ChallengePanel").then((module) => ({
@@ -56,6 +60,8 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
     loadQuestProgress(window.localStorage),
   );
   const [playerId] = useState(() => getOrCreatePlayerId(window.localStorage));
+  const [playerProgress, setPlayerProgress] =
+    useState<PlayerProgressResponse | null>(null);
   const questStatus = getQuestStatus(questProgress, firstQuest);
   const lesson = getLessonByQuestId(firstQuest.id);
   const dialogueLines = useMemo(() => {
@@ -82,6 +88,27 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
       };
     });
   }, []);
+
+  const refreshPlayerProgress = useCallback(async () => {
+    const nextPlayerProgress = await fetchPlayerProgress(playerId);
+    if (!nextPlayerProgress) {
+      return;
+    }
+
+    setPlayerProgress(nextPlayerProgress);
+    setQuestProgress((currentProgress) => {
+      const nextProgress = mergeQuestProgressFromBackend(
+        currentProgress,
+        nextPlayerProgress,
+      );
+      saveQuestProgress(window.localStorage, nextProgress);
+      return nextProgress;
+    });
+  }, [playerId]);
+
+  useEffect(() => {
+    void refreshPlayerProgress();
+  }, [refreshPlayerProgress]);
 
   const handleNpcInteractionChange = useCallback(
     (nextInteractionState: NpcInteractionState) => {
@@ -127,24 +154,42 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
       playerId,
       questId: firstQuest.id,
       status: "active",
+    }).then((isSynced) => {
+      if (isSynced) {
+        void refreshPlayerProgress();
+      }
     });
     setDialogueSession(null);
     setIsLessonOpen(true);
-  }, [playerId]);
+  }, [playerId, refreshPlayerProgress]);
 
   const handleResetProgress = useCallback(() => {
     setQuestProgress(resetQuestProgress(window.localStorage));
     setDialogueSession(null);
     setIsLessonOpen(false);
     setIsChallengeOpen(false);
+    setPlayerProgress(null);
   }, []);
 
   const handleChallengePassed = useCallback((metadata: ChallengePassedMetadata) => {
-    setQuestProgress((currentProgress) => {
-      const nextProgress = completeQuest(currentProgress, firstQuest.id);
-      saveQuestProgress(window.localStorage, nextProgress);
-      return nextProgress;
-    });
+    if (metadata.progress) {
+      setPlayerProgress(metadata.progress);
+      setQuestProgress((currentProgress) => {
+        const nextProgress = mergeQuestProgressFromBackend(
+          currentProgress,
+          metadata.progress as PlayerProgressResponse,
+        );
+        saveQuestProgress(window.localStorage, nextProgress);
+        return nextProgress;
+      });
+    } else {
+      setQuestProgress((currentProgress) => {
+        const nextProgress = completeQuest(currentProgress, firstQuest.id);
+        saveQuestProgress(window.localStorage, nextProgress);
+        return nextProgress;
+      });
+    }
+
     if (!metadata.submissionStored) {
       void createSubmissionMetadata({
         playerId,
@@ -243,7 +288,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
             </p>
           </div>
 
-          <div className="absolute right-4 top-4">
+          <div className="absolute right-4 top-4 grid gap-3">
             <QuestPanel
               quest={firstQuest}
               status={questStatus}
@@ -252,6 +297,7 @@ export function PlayPage({ onNavigateHome }: PlayPageProps) {
               onOpenChallenge={() => setIsChallengeOpen(true)}
               onResetProgress={handleResetProgress}
             />
+            <ProgressionPanel progress={playerProgress} />
           </div>
 
           {interactionState && !dialogueSession ? (
@@ -304,7 +350,7 @@ function getVillageHint(status: ReturnType<typeof getQuestStatus>) {
   }
 
   if (status === "active") {
-    return "Quest Active: เตรียมเปิดบทเรียน Hello World และ Code Editor ใน Goal ถัดไป";
+    return "Quest Active: เปิดบทเรียน Hello World แล้วส่งโค้ดเพื่อรับ EXP แรก";
   }
 
   if (status === "completed") {
@@ -326,6 +372,19 @@ function isEditableTarget(target: EventTarget | null) {
     tagName === "input" ||
     tagName === "textarea" ||
     tagName === "select"
+  );
+}
+
+function mergeQuestProgressFromBackend(
+  currentProgress: QuestProgress,
+  playerProgress: PlayerProgressResponse,
+): QuestProgress {
+  return playerProgress.quests.reduce<QuestProgress>(
+    (nextProgress, quest) => ({
+      ...nextProgress,
+      [quest.questId]: quest.status,
+    }),
+    currentProgress,
   );
 }
 

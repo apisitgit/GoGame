@@ -181,6 +181,10 @@ go vet ./...
 - runner timeout, source size limit, output cap, temp workspace และ static import guardrail
 - API `/api/v1/code/submit` สำหรับตรวจด้วย hidden/server-managed Go tests
 - Submit ของบท Hello World ตรวจทั้ง output และการใช้ `fmt.Println` ผ่าน Go tests ฝั่ง server/runner
+- backend คำนวณ EXP/Level/Achievement/Skill Tree เองจาก progress
+- reward ผ่านบทแรกครั้งแรก 100 EXP โดย hint ระดับ 1 ไม่หัก, ระดับ 2 หัก 10 EXP, ระดับ 3 หัก 20 EXP
+- ผ่านซ้ำไม่เพิ่ม EXP จาก transaction และ existing progress record
+- Progression Panel ในหน้า `/play` แสดง Level, EXP bar, Achievement และ Skill Tree
 - API documentation ที่ `apps/api/API.md`
 - PostgreSQL service ใน Docker Compose
 - `.gitignore`
@@ -192,8 +196,8 @@ go vet ./...
 - AI Tutor
 - production sandbox
 - ระบบ hidden tests แบบ content/database-driven สำหรับหลายบทเรียน
-- backend-backed progress เป็น source of truth เต็มรูปแบบใน frontend
+- server-side hint usage tracking สำหรับ reward ที่กันการโกงได้มากกว่าระดับ MVP
 
 ## Next Step
 
-Goal ถัดไปที่แนะนำคือ Goal 9: เพิ่ม EXP, Level, Achievement และ Skill Tree ให้ผู้เล่นเห็น progression ชัดเจนขึ้น
+Goal ถัดไปที่แนะนำคือ Goal 10: ทำ Vertical Slice ให้ผู้เล่นใหม่เล่นตั้งแต่เริ่มต้นจนผ่านบทเรียนแรกได้ลื่นขึ้น พร้อมตรวจ error/loading state ทั้ง flow

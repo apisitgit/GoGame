@@ -73,23 +73,25 @@ type runCodeRequest struct {
 }
 
 type submitCodeRequest struct {
-	PlayerID   string `json:"playerId"`
-	QuestID    string `json:"questId"`
-	LessonID   string `json:"lessonId"`
-	SourceCode string `json:"sourceCode"`
+	PlayerID      string `json:"playerId"`
+	QuestID       string `json:"questId"`
+	LessonID      string `json:"lessonId"`
+	SourceCode    string `json:"sourceCode"`
+	RevealedHints int    `json:"revealedHints"`
 }
 
 type submitCodeResponse struct {
-	Status          runner.Status       `json:"status"`
-	Stdout          string              `json:"stdout"`
-	Stderr          string              `json:"stderr"`
-	Message         string              `json:"message"`
-	ExecutionTimeMS int64               `json:"executionTimeMs"`
-	OutputTruncated bool                `json:"outputTruncated"`
-	Tests           *runner.TestSummary `json:"tests,omitempty"`
-	SubmissionID    string              `json:"submissionId,omitempty"`
-	Submission      *domain.Submission  `json:"submission,omitempty"`
-	Details         map[string]string   `json:"details,omitempty"`
+	Status          runner.Status          `json:"status"`
+	Stdout          string                 `json:"stdout"`
+	Stderr          string                 `json:"stderr"`
+	Message         string                 `json:"message"`
+	ExecutionTimeMS int64                  `json:"executionTimeMs"`
+	OutputTruncated bool                   `json:"outputTruncated"`
+	Tests           *runner.TestSummary    `json:"tests,omitempty"`
+	SubmissionID    string                 `json:"submissionId,omitempty"`
+	Submission      *domain.Submission     `json:"submission,omitempty"`
+	Progress        *domain.PlayerProgress `json:"progress,omitempty"`
+	Details         map[string]string      `json:"details,omitempty"`
 }
 
 func registerAPIRoutes(router *gin.Engine, store LearningStore, codeRunner CodeRunner, maxSourceBytes int) {
@@ -196,6 +198,7 @@ func (handler apiHandler) submitCode(ctx *gin.Context) {
 		Status:        mapRunnerStatusToSubmissionStatus(result.Status),
 		StdoutPreview: truncatePreview(response.Stdout),
 		Feedback:      truncatePreview(response.Message),
+		RevealedHints: request.RevealedHints,
 	})
 	if errors.Is(err, progress.ErrNotFound) {
 		writeError(ctx, http.StatusNotFound, "not_found", "ไม่พบ quest หรือ lesson ที่ระบุ", nil)
@@ -208,6 +211,14 @@ func (handler apiHandler) submitCode(ctx *gin.Context) {
 
 	response.SubmissionID = submission.ID
 	response.Submission = &submission
+
+	playerProgress, err := handler.store.GetProgress(ctx.Request.Context(), request.PlayerID)
+	if err != nil {
+		writeInternalError(ctx)
+		return
+	}
+	response.Progress = &playerProgress
+
 	ctx.JSON(http.StatusOK, response)
 }
 
@@ -428,6 +439,9 @@ func validateSubmitCodeRequest(request submitCodeRequest, maxSourceBytes int) ma
 
 	if !isUUID(request.PlayerID) {
 		validationErrors["playerId"] = "ต้องเป็น UUID"
+	}
+	if request.RevealedHints < 0 || request.RevealedHints > 10 {
+		validationErrors["revealedHints"] = "จำนวน hint ต้องอยู่ระหว่าง 0 ถึง 10"
 	}
 
 	return validationErrors

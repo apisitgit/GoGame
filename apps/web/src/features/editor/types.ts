@@ -1,3 +1,5 @@
+import type { PlayerProgressResponse } from "../../shared/api/progress";
+
 export type CodeChallengeRunResult =
   | {
       status: "passed";
@@ -21,4 +23,5 @@ export type ChallengePassedMetadata = {
   stdoutPreview: string;
   feedback: string;
   submissionStored: boolean;
+  progress?: PlayerProgressResponse;
 };
